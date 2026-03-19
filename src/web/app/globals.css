@@ -666,7 +666,11 @@ input, textarea, select {
 }
 
 .resolution-card {
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4); 
+  min-height: 45px;                         
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -696,7 +700,7 @@ input, textarea, select {
 }
 
 .resolution-badge {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
   font-family: 'Be Vietnam Pro', sans-serif;
   color: var(--text-primary);
@@ -945,7 +949,7 @@ input, textarea, select {
 
 .preview-screen {
   aspect-ratio: 9/16;
-  max-height: 380px;
+  max-height: 450px;
   background: linear-gradient(180deg, #fdf5e6 0%, #fef9f0 100%);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);

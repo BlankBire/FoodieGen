@@ -76,7 +76,7 @@ export default function Home() {
           }}>FoodieGen</h1>
         </div>
         <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-          Tạo video marketing đồ ăn tự động với AI · Veo 3.1 Fast
+          Tạo video marketing đồ ăn tự động với AI
         </p>
       </header>
 
@@ -318,7 +318,7 @@ export default function Home() {
                   <label className="form-label">Ngôn ngữ</label>
                   <select className="form-select" style={{ fontSize:12 }}>
                     <option>Tiếng Việt</option>
-                    <option>English</option>
+                    <option>Tiếng Anh</option>
                   </select>
                 </div>
                 <div className="form-group" style={{ marginBottom:0 }}>
