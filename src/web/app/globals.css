@@ -823,6 +823,41 @@ input, textarea, select {
   color: var(--amber-400);
 }
 
+/* Tone Button - Unified Style */
+.tones-container-responsive {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.tone-button-responsive {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+  min-width: 0;
+  text-align: center;
+}
+
+.tone-button-responsive:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.tone-button-responsive.active {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: var(--amber-500);
+  color: var(--amber-600);
+  font-weight: 600;
+}
+
 /* ─────────────────────────────────────────────
    SECTION CARD (form groups)
 ───────────────────────────────────────────── */
@@ -944,12 +979,15 @@ input, textarea, select {
 .preview-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  padding-bottom: var(--space-8);
 }
 
 .preview-screen {
   aspect-ratio: 9/16;
-  max-height: 450px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto var(--space-4);
   background: linear-gradient(180deg, #fdf5e6 0%, #fef9f0 100%);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -960,6 +998,7 @@ input, textarea, select {
   gap: var(--space-3);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
 .preview-screen::before {
@@ -1496,3 +1535,108 @@ input, textarea, select {
 .section-card:nth-child(3) { animation: fadeInUp 0.4s 0.15s var(--ease-default) both; }
 .section-card:nth-child(4) { animation: fadeInUp 0.4s 0.20s var(--ease-default) both; }
 .section-card:nth-child(5) { animation: fadeInUp 0.4s 0.25s var(--ease-default) both; }
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE DESIGN (Media Queries)
+   VeoFood Studio Standard
+   - Tablet: < 1024px
+   - Mobile: < 768px
+───────────────────────────────────────────── */
+
+/* Main Responsive Classes */
+.main-grid-responsive {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .main-grid-responsive {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+
+  .config-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+
+  .preview-sidebar {
+    position: relative !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 500px;
+    margin: var(--space-8) auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --space-6: 16px;
+    --space-8: 24px;
+  }
+
+  body {
+    padding: var(--space-4);
+  }
+
+  .header-responsive {
+    padding: var(--space-4) 0 !important;
+  }
+
+  .header-title {
+    font-size: 22px !important;
+  }
+
+  .section-card {
+    padding: var(--space-4) !important;
+  }
+
+  /* Tones grid responsive */
+  .tones-container-responsive {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tone-button-responsive {
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 80px;
+    font-size: 11px;
+    padding: 10px 0;
+  }
+
+  /* Style grid responsive */
+  .style-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .resolution-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-generate {
+    padding: 16px !important;
+    font-size: 15px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .tone-button-responsive {
+    flex: 1 1 calc(50% - 8px) !important;
+  }
+}

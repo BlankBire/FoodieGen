@@ -39,7 +39,7 @@ const VISUAL_STYLES = [
   { id: 'vintage',   label: 'Vintage'    },
 ]
 
-const TONES    = ['Kích thích', 'Sang trọng', 'Cảm xúc', 'Bán hàng', 'Viral', 'Giáo dục', 'Review', 'Kể chuyện', 'Hài hước']
+const TONES    = ['Kích thích', 'Sang trọng', 'Cảm xúc', 'Bán hàng', 'Viral', 'Review', 'Giáo dục', 'Kể chuyện', 'Hài hước']
 const EMOTIONS = ['Vui tươi', 'Sang trọng', 'Ấm cúng', 'Phấn khích', 'Bình yên', 'Mãnh liệt', 'Bí ẩn', 'Tươi mới']
 const V_GENDER = ['Nam', 'Nữ', 'AI']
 
@@ -59,6 +59,8 @@ export default function Home() {
   const [foodTopic,      setFoodTopic]      = useState('')
   const [mainCharacter,  setMainCharacter]  = useState('')
   const [script,         setScript]         = useState('')
+  const [emotion,        setEmotion]        = useState('Vui tươi')
+  const [language,       setLanguage]       = useState('vi')
 
   const handleFillSamples = () => {
     const randomIdx = Math.floor(Math.random() * RANDOM_TOPICS.length)
@@ -106,7 +108,7 @@ export default function Home() {
     <div style={{ minHeight: '100vh', padding: '0 var(--space-6) var(--space-8)' }}>
 
       {/* ── TOP HEADER ── */}
-      <header style={{
+      <header className="header-responsive" style={{
         textAlign: 'center',
         padding: 'var(--space-8) 0 var(--space-6)',
         borderBottom: '1px solid var(--border-default)',
@@ -128,7 +130,7 @@ export default function Home() {
               style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
             />
           </div>
-          <h1 style={{
+          <h1 className="header-title" style={{
             fontFamily: "'Be Vietnam Pro', sans-serif",
             fontSize: 28, fontWeight: 500,
             letterSpacing: '-0.01em',
@@ -144,14 +146,7 @@ export default function Home() {
       </header>
 
       {/* ── 2-COLUMN LAYOUT ── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 320px',
-        gap: 'var(--space-6)',
-        alignItems: 'start',
-        maxWidth: 1200,
-        margin: '0 auto',
-      }}>
+      <div className="main-grid-responsive">
 
         {/* ═══════════════════════════
             LEFT — Scrollable form
@@ -219,25 +214,11 @@ export default function Home() {
                 <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-3)' }}>
                   <div className="form-group" style={{ marginBottom:0 }}>
                     <label className="form-label" style={{ marginBottom:10, fontSize:11 }}>Tone nội dung</label>
-                    <div style={{ 
-                      display:'flex', 
-                      gap:4,
-                      width: '100%',
-                      flexWrap: 'nowrap'
-                    }}>
+                    <div className="tones-container-responsive">
                       {TONES.map(t => (
                         <button 
                           key={t} 
-                          className={`segment-btn ${activeTone===t?'active':''}`} 
-                          style={{ 
-                            fontSize:9, 
-                            padding:'6px 0',
-                            flex: 1,
-                            justifyContent: 'center',
-                            whiteSpace: 'nowrap',
-                            minWidth: 0,
-                            height: 28
-                          }} 
+                          className={`tone-button-responsive ${activeTone===t?'active':''}`} 
                           onClick={()=>setActiveTone(t)}
                         >
                           {t}
@@ -314,9 +295,9 @@ export default function Home() {
                     value={aspectRatio}
                     onChange={e => setAspectRatio(e.target.value as '9:16'|'16:9'|'1:1')}
                   >
-                    <option value="9:16">9:16 - TikTok / Reels</option>
-                    <option value="16:9">16:9 - YouTube</option>
-                    <option value="1:1">1:1 - Instagram</option>
+                    <option value="9:16">9:16</option>
+                    <option value="16:9">16:9</option>
+                    <option value="1:1">1:1</option>
                   </select>
                 </div>
                 {/* Duration */}
@@ -336,53 +317,43 @@ export default function Home() {
             </div>
           </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--space-6)', alignItems: 'stretch' }}>
+            {/* ── VISUAL & AUDIO GRID ── */}
+            <div className="config-grid" style={{ marginTop: 'var(--space-2)' }}>
               
-              {/* === COL 1: THIẾT LẬP HÌNH ẢNH (VISUALS) === */}
-              <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-5)' }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--amber-600)', textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:8 }}>
+              {/* === COL 1: VISUALS === */}
+              <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--amber-600)', textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:8, minHeight:20 }}>
                   <span style={{ width:4, height:16, background:'var(--amber-600)', borderRadius:2 }} />
                   Hình ảnh & Chuyển động
                 </div>
 
-                {/* Unified Sub-card: Toàn bộ Hình ảnh */}
-                <div style={{
-                  padding:'var(--space-4)',
-                  background:'var(--bg-card)',
-                  border:'1px solid var(--border-default)',
-                  borderRadius:'var(--radius-md)',
-                  boxShadow: 'var(--shadow-sm)',
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'var(--space-5)'
-                }}>
-                  {/* Cảm xúc */}
+                <div className="section-card" style={{ padding:'var(--space-4)', margin:0, flex:1, display:'flex', flexDirection:'column', gap:'var(--space-5)' }}>
                   <div className="form-group" style={{ marginBottom:0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)', marginBottom:'var(--space-2)' }}>Cảm xúc</label>
-                    <CustomSelect>
-                      {EMOTIONS.map(e => <option key={e}>{e}</option>)}
-                    </CustomSelect>
+                    <label className="form-label">Cảm xúc</label>
+                    <select className="form-select" value={emotion} onChange={e=>setEmotion(e.target.value)}>
+                      {EMOTIONS.map(em => <option key={em} value={em}>{em}</option>)}
+                    </select>
                   </div>
 
-                  {/* Phong cách */}
                   <div className="form-group" style={{ marginBottom:0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)', marginBottom:'var(--space-2)' }}>Phong cách</label>
-                    <CustomSelect value={activeStyle} onChange={(e:any)=>setActiveStyle(e.target.value)}>
+                    <label className="form-label">Phong cách</label>
+                    <select className="form-select" value={activeStyle} onChange={e=>setActiveStyle(e.target.value)}>
                       {VISUAL_STYLES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </CustomSelect>
+                    </select>
                   </div>
 
-                  {/* Cường độ chuyển động */}
                   <div className="form-group" style={{ marginBottom:0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)' }}>Cường độ chuyển động</label>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:10 }}>
-                      <span>Nhẹ (x0.5)</span><span>Chuẩn (x1.0)</span><span>Mạnh (x1.5)</span>
+                    <label className="form-label">Cường độ chuyển động</label>
+                    <div style={{ padding: '4px 0' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:4 }}>
+                        <span>Nhẹ (x0.5)</span>
+                        <span>Chuẩn (x1.0)</span>
+                        <span>Mạnh (x1.5)</span>
+                      </div>
+                      <input type="range" className="range-slider" min={0} max={100} value={motionIntensity} onChange={e=>setMotionIntensity(Number(e.target.value))} />
                     </div>
-                    <input type="range" className="range-slider" min={0} max={100} value={motionIntensity} onChange={e=>setMotionIntensity(Number(e.target.value))} />
                   </div>
 
-                  {/* Bottom Controls: Chuyển cảnh & Nhất quán */}
                   <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-4)', marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label className="toggle-wrap" style={{ display:'flex', alignItems: 'center' }}>
                       <div className="toggle">
@@ -392,61 +363,65 @@ export default function Home() {
                       <span style={{ fontSize:12, color:'var(--text-primary)', fontWeight:500 }}>Chuyển cảnh</span>
                     </label>
 
-                    <label className="toggle-wrap" style={{ display:'flex', alignItems: 'center', margin: 0 }}>
-                      <div className="toggle">
-                        <input type="checkbox" checked={charConsistency} onChange={e=>setCharConsistency(e.target.checked)} />
-                        <div className="toggle-slider" />
+                    <label className="toggle-wrap" style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontSize:12, color:'var(--text-primary)', fontWeight:500 }}>Nhất quán chủ thể</span>
+                        <div className="toggle">
+                          <input type="checkbox" checked={charConsistency} onChange={e=>setCharConsistency(e.target.checked)} />
+                          <div className="toggle-slider" />
+                        </div>
                       </div>
-                      <span style={{ fontSize:12, color:'var(--text-primary)', fontWeight:500 }}>Nhất quán chủ thể</span>
                     </label>
                   </div>
                 </div>
               </div>
 
-              {/* === COL 2: THIẾT LẬP ÂM THANH (AUDIO) === */}
-              <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-5)' }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--amber-600)', textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:8 }}>
+              {/* === COL 2: AUDIO === */}
+              <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--amber-600)', textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:8, minHeight:20 }}>
                   <span style={{ width:4, height:16, background:'var(--amber-600)', borderRadius:2 }} />
                   Âm thanh & Thuyết minh
                 </div>
 
-                {/* Sub-card: Giọng đọc */}
-                <div style={{
-                  padding:'var(--space-4)',
-                  background:'var(--bg-card)',
-                  border:'1px solid var(--border-default)',
-                  borderRadius:'var(--radius-md)',
-                  boxShadow: 'var(--shadow-sm)',
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'var(--space-5)'
-                }}>
+                <div className="section-card" style={{ padding:'var(--space-4)', margin:0, flex:1, display:'flex', flexDirection:'column', gap:'var(--space-5)' }}>
                   <div className="form-group" style={{ marginBottom:0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)', marginBottom:'var(--space-2)' }}>Kiểu giọng</label>
-                    <CustomSelect value={voiceGender} onChange={(e:any)=>setVoiceGender(e.target.value)}>
-                      {V_GENDER.map(g => <option key={g} value={g}>{g}</option>)}
-                    </CustomSelect>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)', marginBottom: 'var(--space-2)' }}>Ngôn ngữ</label>
-                    <CustomSelect>
-                      <option>Tiếng Việt</option>
-                      <option>Tiếng Anh</option>
-                    </CustomSelect>
+                    <label className="form-label">Kiểu giọng</label>
+                    <select className="form-select" value={voiceGender} onChange={e=>setVoiceGender(e.target.value)}>
+                      {V_GENDER.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
                   </div>
 
                   <div className="form-group" style={{ marginBottom:0 }}>
-                    <label className="form-label" style={{ fontSize:11, color:'var(--text-muted)' }}>Tốc độ đọc</label>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:10 }}>
-                      <span>Chậm (0.5x)</span><span>Vừa (1.0x)</span><span>Nhanh (1.5x)</span>
+                    <label className="form-label">Ngôn ngữ</label>
+                    <select className="form-select" value={language} onChange={e=>setLanguage(e.target.value)}>
+                      <option value="vi">Tiếng Việt</option>
+                      <option value="en">Tiếng Anh</option>
+                      <option value="jp">Tiếng Nhật</option>
+                      <option value="kr">Tiếng Hàn</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom:0 }}>
+                    <label className="form-label">Tốc độ đọc</label>
+                    <div style={{ padding: '4px 0' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:4 }}>
+                        <span>Chậm (0.5x)</span>
+                        <span>Vừa (1.0x)</span>
+                        <span>Nhanh (1.5x)</span>
+                      </div>
+                      <input type="range" className="range-slider" min={0} max={100} value={voiceSpeed} onChange={e=>setVoiceSpeed(Number(e.target.value))} />
                     </div>
-                    <input type="range" className="range-slider" min={0} max={100} value={voiceSpeed} onChange={e=>setVoiceSpeed(Number(e.target.value))} />
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-4)', marginTop: 'auto' }}>
-                    <label className="toggle-wrap" style={{ display:'flex', alignItems: 'center' }}>
+                  <div style={{ 
+                    borderTop: '1px solid var(--border-default)', 
+                    paddingTop: 'var(--space-4)', 
+                    marginTop: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    minHeight: '42px' // Đồng bộ độ cao với cụm 2 nút bên Visual
+                  }}>
+                    <label className="toggle-wrap" style={{ display:'flex', alignItems: 'center', margin: 0 }}>
                       <div className="toggle">
                         <input type="checkbox" checked={bgMusic} onChange={e=>setBgMusic(e.target.checked)} />
                         <div className="toggle-slider" />
@@ -471,7 +446,11 @@ export default function Home() {
         {/* ═══════════════════════════
             RIGHT — Sticky preview
         ═══════════════════════════ */}
-        <div style={{ position:'sticky', top: 24, display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
+        <aside className="preview-sidebar" style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 'var(--space-6)' 
+        }}>
 
           <div style={{ fontSize:13, fontWeight:500, color:'var(--text-secondary)' }}>
             Xem trước video
@@ -505,7 +484,12 @@ export default function Home() {
           </div>
 
           {/* Action row — Enhanced buttons */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--space-3)' }}>
+          <div style={{ 
+            display:'grid', 
+            gridTemplateColumns:'1fr 1fr', 
+            gap:'var(--space-3)',
+            marginBottom: 'var(--space-2)' // Thêm khoảng cách với bảng cấu hình
+          }}>
             <button className="btn-secondary" style={{
               fontSize:13,
               padding:'var(--space-3) var(--space-2)',
@@ -563,8 +547,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-
-        </div>
+        </aside>
       </div>
     </div>
   )
