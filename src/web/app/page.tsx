@@ -40,9 +40,13 @@ export default function Home() {
 
   // State: Content
   const [foodTopic,      setFoodTopic]      = useState('')
+  const [characterType,  setCharacterType]  = useState('Nam')
+  const [locationContext,setLocationContext]= useState('Tại cửa hàng')
   const [mainCharacter,  setMainCharacter]  = useState('')
   const [script,         setScript]         = useState('')
+  const [numScenes,      setNumScenes]      = useState('2 cảnh')
   const [videoUrl,       setVideoUrl]       = useState('')
+  const [productImage,   setProductImage]   = useState<string | null>(null)
 
   // State: UI
   const [loading, setLoading] = useState(false)
@@ -75,7 +79,10 @@ export default function Home() {
         body: JSON.stringify({ 
           topic: foodTopic, 
           tone: activeTone, 
-          projectId: userId 
+          projectId: userId,
+          characterType,
+          locationContext,
+          numScenes
         }),
       })
       const dataContent = await resContent.json()
@@ -129,9 +136,14 @@ export default function Home() {
           <ContentSection 
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
             mainCharacter={mainCharacter} setMainCharacter={setMainCharacter}
+            characterType={characterType} setCharacterType={setCharacterType}
+            locationContext={locationContext} setLocationContext={setLocationContext}
             script={script} setScript={setScript}
             activeTone={activeTone} setActiveTone={setActiveTone}
+            numScenes={numScenes} setNumScenes={setNumScenes}
             onSuggest={handleFillSamples}
+            onGenerateScript={handleGenerate}
+            loading={loading}
           />
 
           <VideoConfigSection 
@@ -175,6 +187,8 @@ export default function Home() {
         {/* RIGHT — Preview & Summary */}
         <PreviewPanel 
           videoUrl={videoUrl}
+          productImage={productImage}
+          setProductImage={setProductImage}
           config={{
             resolution,
             aspectRatio,
