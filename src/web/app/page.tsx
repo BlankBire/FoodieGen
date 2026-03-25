@@ -81,7 +81,8 @@ export default function Home() {
     setVideoUrl('')
     setAudioUrl('')
     setProductImage(null)
-    setStatus('Đã làm mới form.')
+    alert('Đã làm mới form thành công!')
+    setStatus('')
   }
 
   const handleDownload = () => {
@@ -92,7 +93,7 @@ export default function Home() {
   const handleGenerateScript = async () => {
     try {
       if (!foodTopic) {
-        setStatus('Vui lòng nhập chủ đề món ăn.')
+        alert('Vui lòng nhập chủ đề món ăn.')
         return
       }
       setLoading(true)
@@ -128,10 +129,12 @@ export default function Home() {
       ).join('\n\n')
       
       setScript(formattedScript)
-      setStatus('Đã tạo kịch bản thành công! Bạn có thể chỉnh sửa trước khi tạo video.')
+      alert('✅ ĐÃ TẠO KỊCH BẢN THÀNH CÔNG!')
+      setStatus('Kịch bản đã sẵn sàng.')
     } catch (err: any) {
       console.error(err)
-      setStatus('Lỗi tạo kịch bản: ' + err.message)
+      alert('⚠️ LỖI TẠO KỊCH BẢN:\n' + err.message)
+      setStatus('Lỗi tạo kịch bản.')
     } finally {
       setLoading(false)
     }
@@ -140,7 +143,7 @@ export default function Home() {
   const handleGenerateVideo = async () => {
     try {
       if (!script.trim()) {
-        setStatus('Vui lòng nhập kịch bản hoặc nhấn tạo kịch bản trước.')
+        alert('Vui lòng nhập kịch bản hoặc nhấn tạo kịch bản trước.')
         return
       }
       setLoading(true)
@@ -176,10 +179,13 @@ export default function Home() {
         setAudioUrl(rawAudio || '')
       }
 
-      setStatus(dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'Hoàn tất! Video đã sẵn sàng.')
+      const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : '🎉 HOÀN TẤT! Video đã sẵn sàng.'
+      alert(msg)
+      setStatus(msg)
     } catch (err: any) {
       console.error(err)
-      setStatus('Lỗi tạo video: ' + err.message)
+      alert('⚠️ LỖI TẠO VIDEO:\n' + err.message)
+      setStatus('Lỗi tạo video.')
     } finally {
       setLoading(false)
     }
