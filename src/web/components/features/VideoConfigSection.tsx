@@ -60,8 +60,7 @@ export const VideoConfigSection = ({
         <div className="form-group" style={{ marginBottom:0 }}>
           <label className="form-label">Thời lượng</label>
           <select className="form-select" value={duration} onChange={e => setDuration(e.target.value as DurationType)}>
-            <option value="6s">6 giây</option>
-            <option value="8s">8 giây</option>
+            <option value="5s">5 giây</option>
             <option value="10s">10 giây</option>
             <option value="15s">15 giây</option>
             <option value="30s">30 giây</option>

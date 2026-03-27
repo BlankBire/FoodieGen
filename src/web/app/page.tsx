@@ -25,7 +25,7 @@ export default function Home() {
   // State: Video Config
   const [resolution,     setResolution]     = useState<ResolutionType>('720p')
   const [aspectRatio,    setAspectRatio]    = useState<AspectRatioType>('9:16')
-  const [duration,       setDuration]       = useState<DurationType>('6s')
+  const [duration,       setDuration]       = useState<DurationType>('5s')
   const [activeStyle,    setActiveStyle]    = useState('cinematic')
   const [activeTone,     setActiveTone]     = useState(TONES[0])
   const [emotion,        setEmotion]        = useState('Vui tươi')
@@ -80,17 +80,38 @@ export default function Home() {
   }
 
   const handleReset = () => {
+    // Reset Video Config
+    setResolution('720p')
+    setAspectRatio('9:16')
+    setDuration('5s')
+    setActiveStyle('cinematic')
+    setActiveTone(TONES[0])
+    setEmotion('Vui tươi')
+    setMotionIntensity(50)
+    setTransitions(true)
+    setCharConsistency(true)
+
+    // Reset Audio Config
+    setVoiceGender('Nam')
+    setLanguage('vi')
+    setVoiceSpeed(50)
+    setBgMusic(false)
+
+    // Reset Content
     setFoodTopic('')
     setMainCharacter('')
     setCharacterType('Nam')
     setLocationContext('Tại cửa hàng')
     setScript('')
     setScriptId('')
+    setNumScenes('2 cảnh')
     setVideoUrl('')
     setAudioUrl('')
     setProductImage(null)
-    alert('Đã làm mới form thành công!')
+    setIsReadingMode(false)
     setStatus('')
+    
+    alert('Đã làm mới toàn bộ tùy chọn về mặc định!')
   }
 
   const handleDownload = () => {
@@ -142,11 +163,11 @@ export default function Home() {
       ).join('\n\n')
       
       setScript(formattedScript)
-      alert('✅ ĐÃ TẠO KỊCH BẢN THÀNH CÔNG!')
+      alert('ĐÃ TẠO KỊCH BẢN THÀNH CÔNG!')
       setStatus('Kịch bản đã sẵn sàng.')
     } catch (err: any) {
       console.error(err)
-      alert('⚠️ LỖI TẠO KỊCH BẢN:\n' + err.message)
+      alert('LỖI TẠO KỊCH BẢN:\n' + err.message)
       setStatus('Lỗi tạo kịch bản.')
     } finally {
       setLoading(false)
@@ -192,12 +213,12 @@ export default function Home() {
         setAudioUrl(rawAudio || '')
       }
 
-      const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : '🎉 HOÀN TẤT! Video đã sẵn sàng.'
+      const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'HOÀN TẤT! Video đã sẵn sàng.'
       alert(msg)
       setStatus(msg)
     } catch (err: any) {
       console.error(err)
-      alert('⚠️ LỖI TẠO VIDEO:\n' + err.message)
+      alert('LỖI TẠO VIDEO:\n' + err.message)
       setStatus('Lỗi tạo video.')
     } finally {
       setLoading(false)
