@@ -18,6 +18,7 @@ interface ContentSectionProps {
   setNumScenes: (v: string) => void;
   onSuggest: () => void;
   onGenerateScript: () => void;
+  onToggleReadingMode?: () => void;
   loading: boolean;
 }
 
@@ -31,6 +32,7 @@ export const ContentSection = ({
   numScenes, setNumScenes,
   onSuggest,
   onGenerateScript,
+  onToggleReadingMode,
   loading
 }: ContentSectionProps) => (
   <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
@@ -131,14 +133,26 @@ export const ContentSection = ({
         <div className="form-group" style={{ marginBottom: 0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 'var(--space-3)' }}>
             <label className="form-label" style={{ marginBottom:0, fontWeight: 700, color: '#b45309' }}>KỊCH BẢN CHI TIẾT</label>
-            <button 
-              className="btn-primary" 
-              onClick={onGenerateScript}
-              disabled={loading}
-              style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
-            >
-              {loading ? 'Đang tạo...' : 'AI tạo kịch bản'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                className="btn-icon-small" 
+                onClick={onToggleReadingMode}
+                title="Mở chế độ đọc toàn màn hình"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                Chế độ đọc
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={onGenerateScript}
+                disabled={loading}
+                style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
+              >
+                {loading ? 'Đang tạo...' : 'AI tạo kịch bản'}
+              </button>
+            </div>
           </div>
           <textarea 
             className="form-textarea" 

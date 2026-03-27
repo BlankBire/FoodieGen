@@ -38,6 +38,7 @@ build/
 *.tsbuildinfo
 .next/
 .cache/
+.turbo/
 
 # Service account
 foodiegen-service-account.json

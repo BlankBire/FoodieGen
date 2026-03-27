@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AlertCircle } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -54,6 +54,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [toast, setToast] = useState<{ message: string; hiding: boolean } | null>(null)
+  const [isReadingMode, setIsReadingMode] = useState(false)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isReadingMode) setIsReadingMode(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isReadingMode])
 
   const showToast = (message: string) => {
     setToast({ message, hiding: false })
@@ -209,6 +217,7 @@ export default function Home() {
             numScenes={numScenes} setNumScenes={setNumScenes}
             onSuggest={handleFillSamples}
             onGenerateScript={handleGenerateScript}
+            onToggleReadingMode={() => setIsReadingMode(true)}
             loading={loading}
           />
 
@@ -317,6 +326,40 @@ export default function Home() {
               <p style={{ fontSize: '13px', opacity: 0.9, lineHeight: 1.4, margin: 0 }}>
                 {toast.message}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Reading Mode Modal Overlay */}
+      {isReadingMode && (
+        <div className="reading-mode-overlay" onClick={() => setIsReadingMode(false)}>
+          <div className="reading-mode-paper" onClick={e => e.stopPropagation()}>
+            <div className="reading-mode-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="section-title-dot" />
+                <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>CHẾ ĐỘ ĐỌC KỊCH BẢN</span>
+              </div>
+              <button 
+                className="btn-icon-small" 
+                onClick={() => setIsReadingMode(false)}
+                style={{ background: '#f1f5f9', color: '#64748b', border: 'none' }}
+              >
+                Đóng ×
+              </button>
+            </div>
+            <div className="reading-mode-body">
+              <textarea 
+                className="reading-mode-textarea"
+                value={script}
+                onChange={e => setScript(e.target.value)}
+                placeholder="Nhập hoặc chỉnh sửa kịch bản của bạn tại đây..."
+                autoFocus
+              />
+            </div>
+            <div style={{ padding: '16px 32px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                Gợi ý: Bạn có thể chỉnh sửa trực tiếp trên trang giấy này.
+              </span>
             </div>
           </div>
         </div>
