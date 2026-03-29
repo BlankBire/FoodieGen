@@ -51,6 +51,7 @@ export default function Home() {
   const [numScenes,      setNumScenes]      = useState('2 cảnh')
   const [videoUrl,       setVideoUrl]       = useState('')
   const [audioUrl,       setAudioUrl]       = useState('')
+  const [videoScenes,    setVideoScenes]    = useState<any[]>([])
   const [productImage,   setProductImage]   = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
@@ -90,6 +91,7 @@ export default function Home() {
         if (d.mainCharacter) setMainCharacter(d.mainCharacter)
         if (d.videoGenre) setVideoGenre(d.videoGenre)
         if (d.script) setScript(d.script)
+        if (d.videoScenes) setVideoScenes(d.videoScenes)
         if (d.productImage) setProductImage(d.productImage)
         if (d.videoUrl) setVideoUrl(d.videoUrl)
         if (d.audioUrl) setAudioUrl(d.audioUrl)
@@ -149,6 +151,7 @@ export default function Home() {
     setNumScenes('2 cảnh')
     setVideoUrl('')
     setAudioUrl('')
+    setVideoScenes([])
     setProductImage(null)
     setIsReadingMode(false)
     setStatus('')
@@ -296,10 +299,13 @@ export default function Home() {
       if (dataVideo.error) throw new Error(dataVideo.error)
 
       if (dataVideo.results && dataVideo.results.length > 0) {
-        const rawVideo = dataVideo.results[0].videoClipUrl
-        const rawAudio = dataVideo.results[0].audioUrl
-        setVideoUrl(rawVideo ? toProxyUrl(rawVideo) : '')
-        setAudioUrl(rawAudio || '')
+        setVideoScenes(dataVideo.results)
+        // Compatibility for old code
+        setVideoUrl(dataVideo.results[0].videoClipUrl)
+        setAudioUrl(dataVideo.results[0].audioUrl)
+        
+        alert('ĐÃ TẠO VIDEO THÀNH CÔNG!')
+        setStatus('Hoàn tất tạo video.')
       }
 
       const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'HOÀN TẤT! Video đã sẵn sàng.'
@@ -381,10 +387,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* RIGHT — Preview & Summary */}
+        {/* RIGHT — Preview & Metadata */}
         <PreviewPanel 
-          videoUrl={videoUrl}
-          audioUrl={audioUrl}
+          scenes={videoScenes}
           productImage={productImage}
           setProductImage={setProductImage}
           config={{

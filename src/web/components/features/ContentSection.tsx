@@ -118,6 +118,7 @@ export const ContentSection = ({
             value={numScenes} 
             onChange={e => setNumScenes(e.target.value)}
           >
+            <option>1 cảnh</option>
             <option>2 cảnh</option>
             <option>3 cảnh</option>
             <option>5 cảnh</option>

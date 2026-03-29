@@ -1,9 +1,14 @@
 import React, { useRef } from 'react';
 import { VISUAL_STYLES } from '../../constants';
 
+interface VideoSceneData {
+  videoClipUrl: string;
+  audioUrl: string;
+  sceneOrder: number;
+}
+
 interface PreviewPanelProps {
-  videoUrl?: string;
-  audioUrl?: string;
+  scenes?: VideoSceneData[];
   productImage: string | null;
   setProductImage: (v: string | null) => void;
   config: {
@@ -18,8 +23,9 @@ interface PreviewPanelProps {
   onDownload?: () => void;
 }
 
-export const PreviewPanel = ({ videoUrl, audioUrl, productImage, setProductImage, config, onReset, onDownload }: PreviewPanelProps) => {
+export const PreviewPanel = ({ scenes, productImage, setProductImage, config, onReset, onDownload }: PreviewPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentIdx, setCurrentIdx] = React.useState(0);
   
   // Find the label for the active style
   const styleLabel = VISUAL_STYLES.find(s => s.id === config.activeStyle)?.label || config.activeStyle;
@@ -35,6 +41,16 @@ export const PreviewPanel = ({ videoUrl, audioUrl, productImage, setProductImage
     }
   };
 
+  const currentScene = scenes && scenes.length > 0 ? scenes[currentIdx] : null;
+
+  const handleVideoEnd = () => {
+    if (scenes && currentIdx < scenes.length - 1) {
+      setCurrentIdx(currentIdx + 1);
+    } else {
+      setCurrentIdx(0); // Loop back to start
+    }
+  };
+
   return (
     <aside className="preview-sidebar">
       <div className="preview-panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -42,19 +58,19 @@ export const PreviewPanel = ({ videoUrl, audioUrl, productImage, setProductImage
         
         {/* Video Preview Screen */}
         <div className="preview-screen">
-          <div className="preview-badge-top">{config.resolution === '1080p' ? '1080p' : '720p'}</div>
+          <div className="preview-badge-top">
+            {scenes && scenes.length > 1 ? `Cảnh ${currentIdx + 1}/${scenes.length}` : (config.resolution === '1080p' ? '1080p' : '720p')}
+          </div>
           
-          {videoUrl ? (
+          {currentScene ? (
             <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <video 
-                src={videoUrl} 
+                key={currentScene.videoClipUrl}
+                src={currentScene.videoClipUrl} 
                 controls 
-                autoPlay 
+                onEnded={handleVideoEnd}
                 style={{ width: '100%', height: '100%', borderRadius: 'var(--radius-lg)', objectFit: 'cover' }}
               />
-              {audioUrl && (
-                <audio src={audioUrl} autoPlay hidden />
-              )}
             </div>
           ) : (
             <div className="preview-placeholder">
