@@ -84,7 +84,9 @@ export const VisualAudioSection = ({
         <div className="form-group" style={{ marginBottom:0 }}>
           <label className="form-label">Kiểu giọng</label>
           <select className="form-select" value={voiceGender} onChange={e=>setVoiceGender(e.target.value)}>
-            {V_GENDER.map(v => <option key={v} value={v}>{v}</option>)}
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+            <option value="AI">AI</option>
           </select>
         </div>
 

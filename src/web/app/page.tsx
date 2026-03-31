@@ -11,7 +11,7 @@ function toProxyUrl(raw: string): string {
   const base64 = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   return `${API_BASE}/api/video/proxy?u=${encodeURIComponent(base64)}`
 }
-import { RANDOM_TOPICS, TONES } from '../constants'
+import { TONES, CHARACTERS } from '../constants'
 import { ResolutionType, AspectRatioType, DurationType } from '../types'
 
 // Components
@@ -43,7 +43,7 @@ export default function Home() {
   const [foodTopic,      setFoodTopic]      = useState('')
   const [characterType,  setCharacterType]  = useState('Nam')
   const [locationContext,setLocationContext]= useState('Tại cửa hàng')
-  const [mainCharacter,  setMainCharacter]  = useState('')
+  const [mainCharacter,  setMainCharacter]  = useState('Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.')
   const [videoGenre,     setVideoGenre]     = useState('Giới thiệu món ăn')
   const [script,         setScript]         = useState('')
   const [scriptId,       setScriptId]       = useState('')
@@ -113,14 +113,6 @@ export default function Home() {
     }, 4000)
   }
 
-  const handleFillSamples = () => {
-    const randomIdx = Math.floor(Math.random() * RANDOM_TOPICS.length)
-    const item = RANDOM_TOPICS[randomIdx]
-    setFoodTopic(item.topic)
-    setMainCharacter(item.character)
-    setScript(item.script)
-  }
-
   const handleReset = () => {
     // Reset Video Config
     setResolution('720p')
@@ -141,9 +133,11 @@ export default function Home() {
 
     // Reset Content
     setFoodTopic('')
-    setMainCharacter('')
+    const defaultChar = CHARACTERS.find(c => c.id === 'male_chef') || CHARACTERS[1]
+    setMainCharacter(defaultChar.defaultDescription)
+    setCharacterType(defaultChar.gender)
+    setVoiceGender(defaultChar.gender)
     setVideoGenre('Giới thiệu món ăn')
-    setCharacterType('Nam')
     setLocationContext('Tại cửa hàng')
     setScript('')
     setScriptId('')
@@ -336,12 +330,12 @@ export default function Home() {
             script={script} setScript={setScript}
             activeTone={activeTone} setActiveTone={setActiveTone}
             numScenes={numScenes} setNumScenes={setNumScenes}
-            onSuggest={handleFillSamples}
             onGenerateScript={handleGenerateScript}
             onToggleReadingMode={() => setIsReadingMode(true)}
             videoGenre={videoGenre}
             setVideoGenre={setVideoGenre}
             loading={loading}
+            setVoiceGender={setVoiceGender}
           />
 
           <VideoConfigSection 

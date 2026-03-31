@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         source: '/audio/:path*',
         destination: 'http://localhost:3001/audio/:path*',
       },
+      {
+        source: '/videos/:path*',
+        destination: 'http://localhost:3001/videos/:path*',
+      },
     ]
   },
 }
