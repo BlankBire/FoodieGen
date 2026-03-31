@@ -91,6 +91,7 @@ export async function POST(req: Request) {
     }
 
     let scenes: any[] = [];
+    let fullAudioScript = '';
     const defaultProjectId = '123e4567-e89b-12d3-a456-426614174000';
 
     if (manualScript && manualScript.trim()) {
@@ -98,13 +99,19 @@ export async function POST(req: Request) {
        const newScript = await prisma.videoScript.create({
          data: {
              project: { connect: { id: script?.projectId || defaultProjectId } },
-             content: scenes as any
+             content: { scenes } as any
          }
        });
        script = newScript;
        finalScriptId = newScript.id;
     } else if (script) {
-       scenes = script.content as any[];
+       const content = script.content as any;
+       if (Array.isArray(content)) {
+         scenes = content;
+       } else if (content && typeof content === 'object') {
+         scenes = content.scenes || [];
+         fullAudioScript = content.fullAudioScript || '';
+       }
     }
 
     if (!scenes || scenes.length === 0) return NextResponse.json({ error: 'No script' }, { status: 400 });
@@ -128,8 +135,12 @@ export async function POST(req: Request) {
     if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
 
     // --- CONSOLIDATION FOR COST SAVING (CHẾ ĐỘ CHẮT CHIU) ---
-    const totalAudioScript = scenes.map(s => s.audioScript).join('... ');
-    const combinedVisualPrompt = scenes.map(s => s.visualDescription).join(' [TRANSITION] ').substring(0, 1000); 
+    const totalAudioScript = fullAudioScript || scenes.map(s => s.audioScript).join('... ');
+    const combinedVisualPrompt = scenes.map(s => {
+      const desc = s.visualDescription || '';
+      const kw = s.technicalKeywords || '';
+      return `${desc} ${kw}`.trim();
+    }).join(' [TRANSITION] ').substring(0, 1000); 
 
     let audioUrl = '';
     const audioFileName = `combined_${finalScriptId}.mp3`;

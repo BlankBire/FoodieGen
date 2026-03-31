@@ -228,7 +228,9 @@ export default function Home() {
           tone: activeTone, 
           projectId: userId,
           characterType,
+          mainCharacter,
           locationContext,
+          videoGenre,
           numScenes,
           productImage 
         }),
@@ -244,9 +246,12 @@ export default function Home() {
       }
       
       // Format script for human reading
-      const formattedScript = dataContent.scenes.map((s: any) => 
-        `CẢNH ${s.sceneOrder}: ${s.title}\n- Hình ảnh: ${s.visualDescription}\n- Lời thoại: ${s.audioScript}`
+      const scenesText = dataContent.scenes.map((s: any) => 
+        `CẢNH ${s.sceneOrder || '?'}: ${s.title}\n- Hình ảnh: ${s.visualDescription}`
       ).join('\n\n')
+      
+      const fullAudio = dataContent.fullAudioScript || (dataContent.scenes as any).fullAudioScript || ''
+      const formattedScript = `[LỜI THOẠI TOÀN BỘ VIDEO]\n${fullAudio}\n\n[CHI TIẾT PHÂN CẢNH]\n${scenesText}`
       
       setScript(formattedScript)
       alert('ĐÃ TẠO KỊCH BẢN THÀNH CÔNG!')
