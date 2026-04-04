@@ -138,7 +138,13 @@ export async function POST(req: Request) {
     if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
 
     // --- CONSOLIDATION FOR COST SAVING (CHẾ ĐỘ CHẮT CHIU) ---
-    const totalAudioScript = fullAudioScript || scenes.map(s => s.audioScript).join('... ');
+    // --- TRÍ TUYỆT ĐỐI: CHẾ ĐỘ CHÍN MUỒI (Bám sát kịch bản) ---
+    const totalAudioScript = (fullAudioScript && fullAudioScript.trim()) 
+      ? fullAudioScript 
+      : scenes.map((s: any) => s.audioScript).filter(Boolean).join('... ');
+
+    console.log(`[DEBUG-AUDIO] FINAL TEXT TO READ: "${totalAudioScript}"`);
+
     const combinedVisualPrompt = scenes.map(s => {
       const desc = s.visualDescription || '';
       const kw = s.technicalKeywords || '';
@@ -194,9 +200,25 @@ export async function POST(req: Request) {
           console.log(''); 
           
           if (audioBuffer) {
-            fs.writeFileSync(audioFilePath, audioBuffer);
-            audioUrl = `/audio/${audioFileName}`;
-            console.log(`[FPT-AI] SUCCESS. Audio saved to ${audioFilePath}`);
+            const rawAudioPath = path.join(audioDir, `raw_${audioFileName}`);
+            fs.writeFileSync(rawAudioPath, audioBuffer);
+            
+            // --- FFmpeg SILENCE PADDING (Add 1s at the end) ---
+            try {
+              console.log(`[FFMPEG] Adding 1s silence padding to audio...`);
+              const { execSync } = require('child_process');
+              const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
+              // Lệnh này nối thêm 1 giây im lặng và chuẩn hóa về 44.1k stereo
+              execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
+              
+              audioUrl = `/audio/${audioFileName}`;
+              console.log(`[FFMPEG] Audio padding success.`);
+              if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
+            } catch (padErr) {
+              console.error(`[FFMPEG-PAD-ERROR] Failed to add silence, using raw audio:`, padErr);
+              fs.writeFileSync(audioFilePath, audioBuffer); // Fallback to raw
+              audioUrl = `/audio/${audioFileName}`;
+            }
           } else {
             console.error(`[FPT-AI] Polling timeout (60s).`);
           }
@@ -208,65 +230,53 @@ export async function POST(req: Request) {
       }
     }
 
-    // --- RUNWAY CONFIGURATION (DYNAMIC & STABLE) ---
-    const targetDur = parseInt(String(config?.duration || '6').replace(/[^0-9]/g, '')) || 6;
-    let modelId = 'veo3.1_fast';
-    let duration = targetDur; // Try current request
+    // --- RUNWAY CONFIGURATION (UPGRADED) ---
+    const targetDur = parseInt(String(config?.duration || '10').replace(/[^0-9]/g, '')) || 10;
+    let modelId = 'gen3a_turbo'; 
+    let duration = targetDur;
     
-    // Smart Model Picker
-    if (targetDur === 5 || targetDur === 10) {
-      modelId = 'gen3a_turbo';
-    } else {
-      modelId = 'veo3.1_fast';
-      duration = 6; // Default safe for Veo
-    }
-
+    const MODELS_PRIORITY = ['gen4.5', 'gen3a_turbo', 'veo3.1_fast', 'veo3.1', 'veo3'];
     const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
 
-    // Xây dựng prompt chi tiết dựa trên mọi cấu hình người dùng chọn
+    // Xây dựng prompt chi tiết với hiệu ứng Lip Sync & Cinematic
     const visualPrompt = [
       `A ${duration}-second cinematic 4k video about ${projectTopic}.`,
       combinedVisualPrompt,
+      `Main Character: ${script?.project?.mainCharacter || 'chef'} speaking directly to the camera, vibrant facial expressions.`,
+      `Mouth movement, lip sync, speaking naturally, friendly interaction.`,
       `Style: ${config?.activeStyle || 'cinematic'}.`,
-      `Emotion: ${config?.emotion || 'natural'}.`,
-      `Motion: Intensity ${config?.motionIntensity || 50}/100.`,
-      config?.charConsistency ? `Maintain absolute character consistency.` : ``,
-      config?.transitions ? `Smooth transitions between segments.` : ``,
-      `Photorealistic, raw, high detailed materials, 8k resolution standards.`
+      `Vivid colors, cinematic lighting, material texture, sharp focus on the dish and the person.`,
+      `NO smoke, NO noise, high motion but stable camera.`
     ].filter(Boolean).join(' ').slice(0, 1000);
     
     const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
 
-    console.log(`[RUNWAY] Generating ${duration}S VIDEO with ${modelId}...`);
+    console.log(`[RUNWAY] Target: ${duration}S with Model Priority...`);
     let res: { id: string } | null = null;
     let lastErr: any = null;
     
-    try {
-      res = await (runway.textToVideo as any).create({
-        model: modelId,
-        promptText: visualPrompt,
-        ratio,
-        duration, // Now fully dynamic
-      });
-    } catch (e: any) {
-      lastErr = e;
-      console.warn(`[RUNWAY] ${modelId} failed:`, e?.message || e);
-      // Fallback to safe 6s if 10s or 5s fails
-      if (modelId !== 'veo3.1_fast') {
-         console.log(`[RUNWAY] Falling back to veo3.1_fast (6s)...`);
-         try {
-           res = await (runway.textToVideo as any).create({
-             model: 'veo3.1_fast',
-             promptText: visualPrompt,
-             ratio,
-           });
-         } catch (fallbackErr: any) {
-           lastErr = fallbackErr;
-         }
+    for (const mid of MODELS_PRIORITY) {
+      try {
+        console.log(`[RUNWAY] Attempting Model: ${mid} with Duration: ${duration}s`);
+        
+        res = await (runway.textToVideo as any).create({
+          model: mid,
+          promptText: visualPrompt,
+          ratio,
+          duration: duration, 
+        });
+        if (res) {
+          modelId = mid;
+          break;
+        }
+      } catch (e: any) {
+        lastErr = e;
+        console.warn(`[RUNWAY] ${mid} failed:`, e?.message || e);
+        continue;
       }
     }
 
-    if (!res) throw lastErr || new Error('Không có model Runway nào hoạt động');
+    if (!res) throw lastErr || new Error('Không có model Runway nào khả dụng (vui lòng kiểm tra Credits/Hạng tài khoản)');
 
     let task = await runway.tasks.retrieve(res.id);
     while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {

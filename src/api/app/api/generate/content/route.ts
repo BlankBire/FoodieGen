@@ -27,31 +27,34 @@ export async function POST(req: Request) {
     const sceneCountStr = String(numScenes || '2 cảnh');
     const sceneCount = parseInt(sceneCountStr.replace(/[^0-9]/g, '')) || 2;
 
-    const basePrompt = `Bạn là một chuyên gia sáng tạo nội dung (Content Creator) và đạo diễn điện ảnh hàng đầu chuyên về mảng ẩm thực trên TikTok và TVC.
-NHIỆM VỤ: Hãy tạo một kịch bản video cực kỳ lôi cuốn, có chiều sâu và ý nghĩa cho món ăn: "${topic}".
+    const durationRaw = String(body.duration || '10').replace(/[^0-9]/g, '');
+    const durationNum = parseInt(durationRaw) || 10;
+    const voiceDuration = Math.max(durationNum - 1, 1); 
+    const maxWords = Math.floor(voiceDuration * 2.5); // 2.5 từ/giây để an toàn tuyệt đối
 
-THÔNG TIN QUAN TRỌNG:
-- Tổng số phân cảnh: ${sceneCount} cảnh. (Bắt buộc trả về đúng ${sceneCount} phân cảnh).
-- Thể loại video: ${videoGenre || 'Giới thiệu món ăn'}. Hãy bám sát cấu trúc của thể loại này.
-- Tone giọng: ${tone}.
-- Bối cảnh: ${locationContext || 'Trong cửa hàng'}.
-- Nhân vật chính: ${characterType} (${mainCharacter || 'Nam đầu bếp tận tâm'}). 
-  LƯU Ý: AI Voice sẽ là giọng ${characterType}, hãy viết kịch bản phù hợp với giới tính này.
+    console.log(`[V8-DEBUG] Target Duration: ${durationNum}s | Voice Window: ${voiceDuration}s | Max Words: ${maxWords}`);
 
-YÊU CẦU CẤU TRÚC JSON (BẮT BUỘC TRẢ VỀ ĐỐI TƯỢNG JSON):
+    const basePrompt = `Bạn là một đạo diễn ẩm thực tài ba.
+NHIỆM VỤ: Tạo lời thoại video cho món: "${topic}".
+
+QUY TẮC BẮT BUỘC:
+- Lời thoại KHÔNG ĐƯỢC VƯỢT QUÁ ${maxWords} TỪ.
+- CHỈ TRẢ VỀ LỜI THOẠI, KHÔNG trả về các câu dẫn như "Đây là kịch bản", "Chào bạn", v.v.
+- Nội dung phải cô đọng, giàu cảm xúc, kết thúc ở giây thứ ${voiceDuration}.
+
+YÊU CẦU CẤU TRÚC JSON:
 {
-  "fullAudioScript": "Lời thuyết minh cực kỳ ngắn gọn (Tối đa 25-30 từ cho toàn bộ video), ý nghĩa, cô đọng.",
+  "fullAudioScript": "Lời thoại dài xấp xỉ ${maxWords} từ. Viết theo phong cách nhân vật đang NÓI CHUYỆN trực tiếp.",
   "scenes": [
     {
       "sceneOrder": 1,
       "title": "Tên cảnh",
-      "visualDescription": "Mô tả hình ảnh bằng tiếng Việt (chỉ mô tả những gì diễn ra, không thêm từ khóa kỹ thuật).",
-      "technicalKeywords": "4k, photorealistic, cinematic lighting, high detailed material texture"
+      "visualDescription": "Mô tả hình ảnh. Nhấn mạnh việc nhân vật đang nói chuyện, môi nhấp máy theo lời thoại.",
+      "technicalKeywords": "4k, photorealistic, cinematic lighting, high detailed material texture, mouth movement, lip sync"
     },
     ... (đúng số cảnh ${sceneCount})
   ]
 }
-
 - Hành động: ${mainCharacter} đang làm gì cụ thể?
 
 CHÚ Ý: Chỉ trả về JSON, không thêm văn bản khác.`;

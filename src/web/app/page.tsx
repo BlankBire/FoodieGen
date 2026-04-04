@@ -239,6 +239,7 @@ export default function Home() {
           locationContext,
           videoGenre,
           numScenes,
+          duration,
           productImage 
         }),
       })
