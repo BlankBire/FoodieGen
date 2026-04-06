@@ -4,6 +4,7 @@ import RunwayML from '@runwayml/sdk';
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import path from 'path';
+import { CHARACTERS, VOICES } from '../../../../lib/constants';
 
 /** 
  * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
@@ -75,6 +76,111 @@ async function refineManualScript(rawText: string, apiKey: string) {
   }
 }
 
+async function generateAudioTask(
+  totalAudioScript: string,
+  config: any,
+  finalScriptId: string,
+  audioDir: string,
+  audioFilePath: string
+) {
+  if (!totalAudioScript.trim()) return '';
+
+  const fptVoice = config?.voiceGender || 'leminh';
+  console.log(`[FPT-AI] [TASK] Generating TTS with Voice ID: ${fptVoice}...`);
+  const fptApiKey = process.env.FPT_AI_API_KEY;
+  const fptSpeed = Math.floor(((config?.voiceSpeed || 50) / 100) * 6) - 2;
+  
+  try {
+    const fptRes = await fetch(`https://api.fpt.ai/hmi/tts/v5`, {
+      method: 'POST',
+      headers: { 
+        'api_key': fptApiKey || '',
+        'voice': fptVoice,
+        'speed': String(fptSpeed),
+        'format': 'mp3'
+      },
+      body: totalAudioScript.trim()
+    });
+    
+    const fptData = await fptRes.json();
+    if (fptData.async && fptData.error === 0) {
+      const asyncUrl = fptData.async;
+      let audioBuffer: Buffer | null = null;
+      
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const checkRes = await fetch(asyncUrl);
+          if (checkRes.ok && checkRes.headers.get('content-type')?.includes('audio')) {
+            audioBuffer = Buffer.from(await checkRes.arrayBuffer());
+            break;
+          }
+        } catch (e) {}
+      }
+      
+      if (audioBuffer) {
+        const rawAudioPath = path.join(audioDir, `raw_fpt_${finalScriptId}.mp3`);
+        fs.writeFileSync(rawAudioPath, audioBuffer);
+        
+        try {
+          const { execSync } = require('child_process');
+          const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
+          execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
+          if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
+          return `/audio/fpt_${finalScriptId}.mp3`;
+        } catch (padErr) {
+          console.error(`[FPT-AI-PAD-ERROR]`, padErr);
+          fs.writeFileSync(audioFilePath, audioBuffer);
+          return `/audio/fpt_${finalScriptId}.mp3`;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error(`[FPT-AI-TASK-CRITICAL]`, err.message);
+  }
+  return '';
+}
+
+async function generateVideoTask(
+  runway: RunwayML,
+  visualPrompt: string,
+  ratio: string,
+  duration: number
+) {
+  const MODELS_PRIORITY = ['gen4.5', 'gen3a_turbo', 'veo3.1_fast', 'veo3.1', 'veo3'];
+  let res: { id: string } | null = null;
+  let lastErr: any = null;
+  
+  for (const mid of MODELS_PRIORITY) {
+    try {
+      console.log(`[RUNWAY] [TASK] Model: ${mid} | Duration: ${duration}s | Request Sent...`);
+      res = await (runway.textToVideo as any).create({
+        model: mid,
+        promptText: visualPrompt,
+        ratio,
+        duration: duration, 
+      });
+      if (res) break;
+    } catch (e: any) {
+      lastErr = e;
+      console.warn(`[RUNWAY-TASK] ${mid} failed:`, e?.message || e);
+    }
+  }
+
+  if (!res) throw lastErr || new Error('Runway generation failed');
+
+  let task = await runway.tasks.retrieve(res.id);
+  while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {
+    await new Promise(r => setTimeout(r, 5000)); // Optimized to 5s
+    task = await runway.tasks.retrieve(res.id);
+  }
+
+  if (task.status === 'SUCCEEDED') {
+    return (task as any).output?.[0] || '';
+  }
+  throw new Error(`Runway task failed: ${task.status}`);
+}
+
 export async function POST(req: Request) {
   try {
     const { scriptId: inputScriptId, manualScript, config } = await req.json();
@@ -137,156 +243,57 @@ export async function POST(req: Request) {
     if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
     if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
 
-    // --- CONSOLIDATION FOR COST SAVING (CHẾ ĐỘ CHẮT CHIU) ---
-    // --- TRÍ TUYỆT ĐỐI: CHẾ ĐỘ CHÍN MUỒI (Bám sát kịch bản) ---
+    // --- PREPARE DATA ---
     const totalAudioScript = (fullAudioScript && fullAudioScript.trim()) 
       ? fullAudioScript 
       : scenes.map((s: any) => s.audioScript).filter(Boolean).join('... ');
 
-    console.log(`[DEBUG-AUDIO] FINAL TEXT TO READ: "${totalAudioScript}"`);
+    const configData = (script?.content as any)?.config || {};
+    const characterId = configData.characterId || '';
+    const characterType = configData.characterType || '';
+    const mainCharacter = configData.mainCharacter || 'chef';
+    
+    // --- SOURCE OF TRUTH: Lookup gender from CHARACTERS constant ---
+    const charDefinition = CHARACTERS.find((c: any) => c.id === characterId);
+    const resolvedGender = charDefinition?.gender || characterType; 
+    const genderInEng = resolvedGender === 'Nam' ? 'Male' : (resolvedGender === 'Nữ' ? 'Female' : '');
 
+    const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
+    const targetDur = parseInt(String(config?.duration || '10').replace(/[^0-9]/g, '')) || 10;
+    const duration = targetDur;
+    
     const combinedVisualPrompt = scenes.map(s => {
       const desc = s.visualDescription || '';
       const kw = s.technicalKeywords || '';
       return `${desc} ${kw}`.trim();
     }).join(' [TRANSITION] ').substring(0, 1000); 
 
-    let audioUrl = '';
-    const audioFileName = `fpt_${finalScriptId}.mp3`;
-    const audioFilePath = path.join(audioDir, audioFileName);
-
-    if (totalAudioScript.trim()) {
-      console.log(`[FPT-AI] Generating TTS with Voice: ${config?.voiceGender === 'Nữ' ? 'Ban Mai' : 'Lê Minh'}...`);
-      const fptApiKey = process.env.FPT_AI_API_KEY;
-      const fptVoice = config?.voiceGender === 'Nữ' ? 'banmai' : 'leminh';
-      const fptSpeed = Math.floor(((config?.voiceSpeed || 50) / 100) * 6) - 3;
-      
-      try {
-        // --- FIX CHỐT HẠ: Đúng giao thức FPT.AI v5 ---
-        // Tham số đưa lên Headers, Body chỉ chứa văn bản thô (Raw Text)
-        const fptRes = await fetch(`https://api.fpt.ai/hmi/tts/v5`, {
-          method: 'POST',
-          headers: { 
-            'api_key': fptApiKey || '',
-            'voice': fptVoice,
-            'speed': String(fptSpeed),
-            'format': 'mp3'
-          },
-          body: totalAudioScript.trim()
-        });
-        
-        const fptData = await fptRes.json();
-        if (fptData.async && fptData.error === 0) {
-          const asyncUrl = fptData.async;
-          console.log(`[FPT-AI] Async URL received: ${asyncUrl}. Waiting for file...`);
-          
-          // Polling mechanism (Max 60s)
-          let audioBuffer: Buffer | null = null;
-          console.log(`[FPT-AI] Start polling for audio file...`);
-          for (let i = 0; i < 30; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            try {
-              const checkRes = await fetch(asyncUrl);
-              // Kiểm tra kỹ Content-Type để đảm bảo file đã "chín"
-              if (checkRes.ok && checkRes.headers.get('content-type')?.includes('audio')) {
-                audioBuffer = Buffer.from(await checkRes.arrayBuffer());
-                break;
-              }
-              process.stdout.write('.'); 
-            } catch (e) {
-              // Not ready yet
-            }
-          }
-          console.log(''); 
-          
-          if (audioBuffer) {
-            const rawAudioPath = path.join(audioDir, `raw_${audioFileName}`);
-            fs.writeFileSync(rawAudioPath, audioBuffer);
-            
-            // --- FFmpeg SILENCE PADDING (Add 1s at the end) ---
-            try {
-              console.log(`[FFMPEG] Adding 1s silence padding to audio...`);
-              const { execSync } = require('child_process');
-              const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
-              // Lệnh này nối thêm 1 giây im lặng và chuẩn hóa về 44.1k stereo
-              execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
-              
-              audioUrl = `/audio/${audioFileName}`;
-              console.log(`[FFMPEG] Audio padding success.`);
-              if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
-            } catch (padErr) {
-              console.error(`[FFMPEG-PAD-ERROR] Failed to add silence, using raw audio:`, padErr);
-              fs.writeFileSync(audioFilePath, audioBuffer); // Fallback to raw
-              audioUrl = `/audio/${audioFileName}`;
-            }
-          } else {
-            console.error(`[FPT-AI] Polling timeout (60s).`);
-          }
-        } else {
-          console.error(`[FPT-AI] API Error: ${fptData.message || 'Unknown'}`);
-        }
-      } catch (err: any) {
-        console.error(`[FPT-AI-CRITICAL] Network error: ${err.message}`);
-      }
-    }
-
-    // --- RUNWAY CONFIGURATION (UPGRADED) ---
-    const targetDur = parseInt(String(config?.duration || '10').replace(/[^0-9]/g, '')) || 10;
-    let modelId = 'gen3a_turbo'; 
-    let duration = targetDur;
-    
-    const MODELS_PRIORITY = ['gen4.5', 'gen3a_turbo', 'veo3.1_fast', 'veo3.1', 'veo3'];
-    const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
-
-    // Xây dựng prompt chi tiết với hiệu ứng Lip Sync & Cinematic
     const visualPrompt = [
       `A ${duration}-second cinematic 4k video about ${projectTopic}.`,
       combinedVisualPrompt,
-      `Main Character: ${script?.project?.mainCharacter || 'chef'} speaking directly to the camera, vibrant facial expressions.`,
-      `Mouth movement, lip sync, speaking naturally, friendly interaction.`,
+      `Character Focus: A ${genderInEng} ${mainCharacter}, smiling, speaking directly to camera, vibrant facial expressions.`,
+      `Identical to product image, high shape preservation, perfect symmetry, detailed surface texture, realistic textures.`,
+      `Cinematic camera motion, smooth panning, slow zoom, professional camera tracking, dynamic sweeping shots.`,
       `Style: ${config?.activeStyle || 'cinematic'}.`,
       `Vivid colors, cinematic lighting, material texture, sharp focus on the dish and the person.`,
-      `NO smoke, NO noise, high motion but stable camera.`
+      `NO smoke, NO noise, high motion but stable professional camera.`
     ].filter(Boolean).join(' ').slice(0, 1000);
-    
+
     const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
+    const audioFileName = `fpt_${finalScriptId}.mp3`;
+    const audioFilePath = path.join(audioDir, audioFileName);
+    let audioUrl = '';
 
-    console.log(`[RUNWAY] Target: ${duration}S with Model Priority...`);
-    let res: { id: string } | null = null;
-    let lastErr: any = null;
+    // --- PARALLEL EXECUTION: AUDIO & VIDEO ---
+    console.log('[PIPELINE] Starting Parallel Generation...');
     
-    for (const mid of MODELS_PRIORITY) {
-      try {
-        console.log(`[RUNWAY] Attempting Model: ${mid} with Duration: ${duration}s`);
-        
-        res = await (runway.textToVideo as any).create({
-          model: mid,
-          promptText: visualPrompt,
-          ratio,
-          duration: duration, 
-        });
-        if (res) {
-          modelId = mid;
-          break;
-        }
-      } catch (e: any) {
-        lastErr = e;
-        console.warn(`[RUNWAY] ${mid} failed:`, e?.message || e);
-        continue;
-      }
-    }
+    const [audioResultUrl, rawVideoUrl] = await Promise.all([
+      generateAudioTask(totalAudioScript, config, finalScriptId, audioDir, audioFilePath),
+      generateVideoTask(runway, visualPrompt, ratio, duration)
+    ]);
 
-    if (!res) throw lastErr || new Error('Không có model Runway nào khả dụng (vui lòng kiểm tra Credits/Hạng tài khoản)');
+    audioUrl = audioResultUrl;
 
-    let task = await runway.tasks.retrieve(res.id);
-    while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {
-      await new Promise(r => setTimeout(r, 7000));
-      task = await runway.tasks.retrieve(res.id);
-    }
-
-    if (task.status === 'SUCCEEDED') {
-      const rawVideoUrl = (task as any).output?.[0] || '';
-      
       // --- FFmpeg MASHUP (EMBED AUDIO INTO VIDEO) ---
       let finalVideoUrl = rawVideoUrl;
       const finalVideoName = `final_${finalScriptId}.mp4`;
@@ -306,7 +313,7 @@ export async function POST(req: Request) {
           const { execSync } = require('child_process');
           const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
           
-          execSync(`"${ffmpegPath}" -y -i "${tempVideoPath}" -i "${audioFilePath}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${finalVideoPath}"`);
+          execSync(`"${ffmpegPath}" -y -i "${tempVideoPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -shortest "${finalVideoPath}"`);
           
           finalVideoUrl = `/videos/${finalVideoName}`;
           console.log(`[FFMPEG] SUCCESS. Output: ${finalVideoUrl}`);
@@ -334,9 +341,6 @@ export async function POST(req: Request) {
       });
       await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'completed' } });
       return NextResponse.json({ success: true, results: [dbScene] });
-    } else {
-      throw new Error(`Runway SINGLE Task Failed: ${res.id}`);
-    }
   } catch (error: any) {
     console.error('[API-CRITICAL]', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

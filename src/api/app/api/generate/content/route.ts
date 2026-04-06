@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log('[V8-DEBUG] CONTENT REQUEST BODY:', { ...body, productImage: body.productImage ? 'BASE64_STUB' : 'null' });
     
-    const { topic, tone, projectId, characterType, mainCharacter, locationContext, videoGenre, numScenes, productImage } = body;
+    const { topic, tone, projectId, characterId, characterType, mainCharacter, locationContext, videoGenre, numScenes, productImage } = body;
     
     if (!topic || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -29,35 +29,54 @@ export async function POST(req: Request) {
 
     const durationRaw = String(body.duration || '10').replace(/[^0-9]/g, '');
     const durationNum = parseInt(durationRaw) || 10;
-    const voiceDuration = Math.max(durationNum - 1, 1); 
-    const maxWords = Math.floor(voiceDuration * 2.5); // 2.5 từ/giây để an toàn tuyệt đối
+    const voiceDuration = durationNum - 1; // Mục tiêu kết thúc trước 1s
+    const maxWords = Math.floor(voiceDuration * 2); // Siết chặt 2 từ/giây để đảm bảo an toàn
 
-    console.log(`[V8-DEBUG] Target Duration: ${durationNum}s | Voice Window: ${voiceDuration}s | Max Words: ${maxWords}`);
+    console.log(`[V8-DEBUG] Target Video: ${durationNum}s | Target Audio: ${voiceDuration}s | Max Words: ${maxWords}`);
 
     const basePrompt = `Bạn là một đạo diễn ẩm thực tài ba.
-NHIỆM VỤ: Tạo lời thoại video cho món: "${topic}".
+NHIỆM VỤ: Tạo nội dung video cho món ăn: "${topic}".
 
-QUY TẮC BẮT BUỘC:
-- Lời thoại KHÔNG ĐƯỢC VƯỢT QUÁ ${maxWords} TỪ.
-- CHỈ TRẢ VỀ LỜI THOẠI, KHÔNG trả về các câu dẫn như "Đây là kịch bản", "Chào bạn", v.v.
-- Nội dung phải cô đọng, giàu cảm xúc, kết thúc ở giây thứ ${voiceDuration}.
+QUY TẮC PHÂN TÍCH HÌNH ẢNH (CỰC KỲ CHI TIẾT):
+- Bạn hãy soi cực kỹ ảnh mẫu (productImage) được tải lên.
+- Phải xác định rõ HÌNH DẠNG HÌNH HỌC (Vd: Hình tròn hoàn hảo, Hình vuông sắc cạnh, Hình Oval).
+- Phải mô tả HOA VĂN/HỌA TIẾT đặc trưng trên bề mặt (Vd: họa tiết truyền thống, hoa văn in nổi, vỏ bánh chín vàng bóng bẩy).
+- Các đặc điểm này PHẢI được đưa vào technicalKeywords để ép Runway giữ đúng "Thần thái" và "Hình dáng" của sản phẩm gốc, không được để sản phẩm bị biến dạng.
 
-YÊU CẦU CẤU TRÚC JSON:
+QUY CÁCH NHÂN VẬT & BỐI CẢNH:
+- Nhân vật chính: Giới tính ${characterType}. Mô tả: ${mainCharacter}.
+- Bối cảnh: ${locationContext}.
+- Thể loại video: ${videoGenre}.
+
+QUY TẮC BẮT BUỘC VỀ THỜI LƯỢNG (SIÊU CÔ ĐỌNG):
+- Lời thoại (fullAudioScript) PHẢI CỰC KỲ DỨT KHOÁT, ĐẾM KỸ TỪ: TUYỆT ĐỐI KHÔNG ĐƯỢC VƯỢT QUÁ ${maxWords} TỪ. Nếu vượt quá, video sẽ bị hỏng hiệu ứng.
+- Mục tiêu: Tất cả lời thoại phải được đọc hết nhanh chóng trong ${voiceDuration} giây (để dư 1-2 giây im lặng chuyên nghiệp ở cuối).
+- Kịch bản này là DUY NHẤT và sẽ được dùng chung cho mọi kiểu giọng đọc (Bắc/Trung/Nam), nên hãy dùng ngôn ngữ phổ thông, dứt khoát.
+- CHỈ TRẢ VỀ JSON, KHÔNG trả về văn bản dẫn chuyện.
+- Phần visualDescription: Viết lời mô tả hình ảnh CHUYÊN NGHIỆP nhưng THÂN THIỆN, dễ hiểu với người dùng (Tiếng Việt). Luôn bao gồm mô tả về chuyển động của máy quay (VD: "Máy quay từ từ tiến lại gần...", "Lia máy nhẹ nhàng từ trái sang phải...").
+- Phần technicalKeywords: Chứa các từ khóa tiếng Anh chuyên môn để AI tạo video (Runway) đạt hiệu quả cao nhất (Vd: cinematic, 4k, slow zoom in, smooth pan, camera sliding, tracking shot, shallow depth of field).
+
+QUY TẮC PHÂN CẢNH (CỰC KỲ QUAN TRỌNG):
+- Cảnh 1 (Scene 1): LUÔN PHẢI bắt đầu bằng hình ảnh cận cảnh nhân vật chính. Nhân vật phải đang mỉm cười, cử động môi tự nhiên (lip-sync) như đang nói chuyện trực tiếp với camera. Thời lượng cảnh 1 chiếm khoảng 30% video.
+- Các cảnh sau: Thực hiện lia máy (pan), trượt (sliding) hoặc thu phóng (zoom) mượt mà chuyển từ nhân vật sang đặc tả vẻ đẹp của món ăn chính.
+- Biểu cảm: Luôn bao gồm các từ khóa biểu cảm vào technicalKeywords (Vd: lip-syncing, talking to camera, smiling, expressive facial movements).
+- Tuyệt đối không để góc quay tĩnh đứng yên.
+- Luân phiên giữa các góc quay: Close-up (Cận cảnh), Macro (Siêu cận), Cinematic tracking.
+- Chuyển động camera phải mượt mà và tập trung vào vẻ đẹp của món ăn và nhân vật chính.
 {
-  "fullAudioScript": "Lời thoại dài xấp xỉ ${maxWords} từ. Viết theo phong cách nhân vật đang NÓI CHUYỆN trực tiếp.",
+  "fullAudioScript": "Lời thoại dài khoảng ${maxWords} từ. Viết theo phong cách nhân vật đang NÓI CHUYỆN trực tiếp.",
   "scenes": [
     {
       "sceneOrder": 1,
       "title": "Tên cảnh",
-      "visualDescription": "Mô tả hình ảnh. Nhấn mạnh việc nhân vật đang nói chuyện, môi nhấp máy theo lời thoại.",
-      "technicalKeywords": "4k, photorealistic, cinematic lighting, high detailed material texture, mouth movement, lip sync"
+      "visualDescription": "Mô tả hình ảnh (Tiếng Việt). Nhấn mạnh hành động của nhân vật và đặc điểm món ăn.",
+      "technicalKeywords": "Từ khóa kỹ thuật (Tiếng Anh). Bao gồm: 4k, photorealistic, cinematic lighting, high detailed material texture, mouth movement, lip sync."
     },
     ... (đúng số cảnh ${sceneCount})
   ]
 }
-- Hành động: ${mainCharacter} đang làm gì cụ thể?
 
-CHÚ Ý: Chỉ trả về JSON, không thêm văn bản khác.`;
+CHÚ Ý: Hãy đảm bảo nhân vật (Giới tính ${characterType}) có hành động và biểu cảm phù hợp với món ăn.`;
 
     if (productImage && productImage.includes('base64,')) {
       const parts = productImage.split('base64,');
@@ -65,9 +84,13 @@ CHÚ Ý: Chỉ trả về JSON, không thêm văn bản khác.`;
       const mimeType = productImage.split(';')[0].split(':')[1];
       
       promptParts = [
-        { text: basePrompt + `\n\nLƯU Ý ĐẶC BIỆT: Người dùng đã tải lên hình ảnh sản phẩm mẫu. 
-1. Đầu tiên, hãy kiểm tra xem hình ảnh đó có phải là đồ ăn hoặc liên quan đến ẩm thực không. Nếu KHÔNG PHẢI đồ ăn, hãy thêm một thuộc tính "warning": "Ảnh không phải đồ ăn" vào JSON trả về, nhưng vẫn cố gắng tạo kịch bản dựa trên tên món ăn: ${topic}.
-2. Nếu LÀ ĐỒ ĂN, hãy mô tả hình ảnh trong visualDescription sao cho bám sát các đặc điểm (màu sắc, hình dáng, cách bày trí) của ảnh mẫu đó.` },
+        { text: basePrompt + `\n\nLƯU Ý ĐẶC BIỆT (PHÂN TÍCH ẢNH THẬT): Người dùng đã tải lên hình ảnh sản phẩm mẫu. 
+1. Đầu tiên, hãy kiểm tra xem hình ảnh đó có phải là đồ ăn không. Nếu KHÔNG PHẢI đồ ăn, thêm "warning": "Ảnh không phải đồ ăn" vào JSON.
+2. Nếu LÀ ĐỒ ĂN: Hãy phân tích CỰC KỲ CHI TIẾT các yếu tố sau và đưa vào visualDescription của TẤT CẢ các cảnh:
+   - Hình dạng hình học chính xác (Vd: bánh hình tròn hoản hảo, hình trụ, hình cầu...). Tuyệt đối giữ đúng hình dạng này (Vd: tròn thì không được tả thành oval). Càng giống ảnh mẫu càng tốt.
+   - Chi tiết bề mặt: Các hoa văn chạm khắc trên bánh, logo, độ bóng của vỏ, các lớp nhân.
+   - Màu sắc: Tông màu chủ đạo chính xác của ảnh mẫu.
+3. Đảm bảo nhân vật chính trong kịch bản (${mainCharacter}) tương tác hoặc giới thiệu món ăn này sao cho bám sát các đặc điểm thật đã phân tích được.` },
         {
           inlineData: {
             data: base64Data,
@@ -187,7 +210,8 @@ CHÚ Ý: Chỉ trả về JSON, không thêm văn bản khác.`;
         projectId,
         content: {
           scenes,
-          fullAudioScript: (scenes as any).fullAudioScript || ''
+          fullAudioScript: (scenes as any).fullAudioScript || '',
+          config: { characterId, characterType, mainCharacter, locationContext, videoGenre }
         },
         version: 1,
         isActive: true,
