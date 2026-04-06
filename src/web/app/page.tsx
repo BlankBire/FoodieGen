@@ -11,7 +11,7 @@ function toProxyUrl(raw: string): string {
   const base64 = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   return `${API_BASE}/api/video/proxy?u=${encodeURIComponent(base64)}`
 }
-import { TONES, CHARACTERS } from '../constants'
+import { TONES, CHARACTERS, VOICES } from '../constants'
 import { ResolutionType, AspectRatioType, DurationType } from '../types'
 
 // Components
@@ -34,13 +34,14 @@ export default function Home() {
   const [charConsistency,setCharConsistency]= useState(true)
 
   // State: Audio Config
-  const [voiceGender,    setVoiceGender]    = useState('Nam')
+  const [voiceGender,    setVoiceGender]    = useState('leminh')
   const [language,       setLanguage]       = useState('vi')
   const [voiceSpeed,     setVoiceSpeed]     = useState(50)
   const [bgMusic,        setBgMusic]        = useState(false)
 
   // State: Content
   const [foodTopic,      setFoodTopic]      = useState('')
+  const [characterId,    setCharacterId]    = useState('male_chef')
   const [characterType,  setCharacterType]  = useState('Nam')
   const [locationContext,setLocationContext]= useState('Tại cửa hàng')
   const [mainCharacter,  setMainCharacter]  = useState('Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.')
@@ -132,11 +133,12 @@ export default function Home() {
     setBgMusic(false)
 
     // Reset Content
-    setFoodTopic('')
     const defaultChar = CHARACTERS.find(c => c.id === 'male_chef') || CHARACTERS[1]
+    setCharacterId(defaultChar.id)
     setMainCharacter(defaultChar.defaultDescription)
     setCharacterType(defaultChar.gender)
-    setVoiceGender(defaultChar.gender)
+    // Default to Le Minh for Male chef
+    setVoiceGender('leminh')
     setVideoGenre('Giới thiệu món ăn')
     setLocationContext('Tại cửa hàng')
     setScript('')
@@ -185,7 +187,7 @@ export default function Home() {
           resolution, aspectRatio, duration, activeStyle, activeTone,
           emotion, motionIntensity, transitions, charConsistency,
           voiceGender, language, voiceSpeed, bgMusic,
-          characterType, locationContext, mainCharacter, numScenes, 
+          characterId, characterType, locationContext, mainCharacter, numScenes, 
           script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
         }
       }
@@ -234,6 +236,7 @@ export default function Home() {
           topic: foodTopic, 
           tone: activeTone, 
           projectId: userId,
+          characterId,
           characterType,
           mainCharacter,
           locationContext,
@@ -338,6 +341,7 @@ export default function Home() {
           <ContentSection 
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
             mainCharacter={mainCharacter} setMainCharacter={setMainCharacter}
+            characterId={characterId} setCharacterId={setCharacterId}
             characterType={characterType} setCharacterType={setCharacterType}
             locationContext={locationContext} setLocationContext={setLocationContext}
             script={script} setScript={setScript}

@@ -22,7 +22,14 @@ export const EMOTIONS = [
   'Bình yên', 'Mãnh liệt', 'Bí ẩn', 'Tươi mới'
 ];
 
-export const V_GENDER = ['Nam', 'Nữ', 'AI'];
+export const VOICES = [
+  { id: 'leminh',    label: 'Nam miền Bắc',  gender: 'Nam' },
+  { id: 'banmai',    label: 'Nữ miền Bắc',  gender: 'Nữ'  },
+  { id: 'giahuy',    label: 'Nam miền Trung', gender: 'Nam' },
+  { id: 'myan',      label: 'Nữ miền Trung',   gender: 'Nữ'  },
+  { id: 'minhquang', label: 'Nam miền Nam', gender: 'Nam' },
+  { id: 'lannhi',    label: 'Nữ miền Nam',   gender: 'Nữ'  },
+];
 
 export const CHARACTERS = [
   { 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { EMOTIONS, VISUAL_STYLES, V_GENDER } from '../../constants';
+import { EMOTIONS, VISUAL_STYLES, VOICES } from '../../constants';
 import { RangeSlider } from '../ui/RangeSlider';
 import { Toggle } from '../ui/Toggle';
 
@@ -84,9 +84,9 @@ export const VisualAudioSection = ({
         <div className="form-group" style={{ marginBottom:0 }}>
           <label className="form-label">Kiểu giọng</label>
           <select className="form-select" value={voiceGender} onChange={e=>setVoiceGender(e.target.value)}>
-            <option value="Nam">Nam</option>
-            <option value="Nữ">Nữ</option>
-            <option value="AI">AI</option>
+            {VOICES.map(v => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
           </select>
         </div>
 

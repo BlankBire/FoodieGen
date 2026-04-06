@@ -5,6 +5,8 @@ interface ContentSectionProps {
   setFoodTopic: (v: string) => void;
   mainCharacter: string;
   setMainCharacter: (v: string) => void;
+  characterId: string;
+  setCharacterId: (v: string) => void;
   characterType: string;
   setCharacterType: (v: string) => void;
   locationContext: string;
@@ -26,6 +28,7 @@ interface ContentSectionProps {
 export const ContentSection = ({
   foodTopic, setFoodTopic,
   mainCharacter, setMainCharacter,
+  characterId, setCharacterId,
   characterType, setCharacterType,
   locationContext, setLocationContext,
   script, setScript,
@@ -42,8 +45,9 @@ export const ContentSection = ({
     const charId = e.target.value;
     const char = CHARACTERS.find(c => c.id === charId);
     if (char) {
+      setCharacterId(char.id);
       setCharacterType(char.gender);
-      setVoiceGender(char.gender);
+      setVoiceGender(char.gender === 'Nam' ? 'leminh' : 'banmai');
       setMainCharacter(char.defaultDescription);
     }
   };
@@ -69,7 +73,7 @@ export const ContentSection = ({
             <select 
               className="form-select" 
               onChange={handleCharacterChange}
-              defaultValue="male_chef"
+              value={characterId}
             >
               {CHARACTERS.map(c => (
                 <option key={c.id} value={c.id}>{c.label}</option>

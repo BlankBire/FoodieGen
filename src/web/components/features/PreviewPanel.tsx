@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { VISUAL_STYLES } from '../../constants';
+import { VISUAL_STYLES, VOICES } from '../../constants';
 
 interface VideoSceneData {
   videoClipUrl: string;
@@ -29,6 +29,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
   
   // Find the label for the active style
   const styleLabel = VISUAL_STYLES.find(s => s.id === config.activeStyle)?.label || config.activeStyle;
+  const voiceLabel = VOICES.find(v => v.id === config.voiceGender)?.label || config.voiceGender;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -191,7 +192,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Voice</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{config.voiceGender}</span>
+              <span style={{ fontWeight: 600, color: '#d97706' }}>{voiceLabel}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Style</span>
