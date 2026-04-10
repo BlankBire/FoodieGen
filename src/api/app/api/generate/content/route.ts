@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '../../../../lib/prisma';
 import { GoogleGenAI } from '@google/genai';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const modelId = 'gemini-2.5-flash'; 
+    const modelId = 'gemini-3.1-flash-lite-preview'; 
 
     let promptParts: any[] = [];
     
@@ -30,53 +32,82 @@ export async function POST(req: Request) {
     const durationRaw = String(body.duration || '10').replace(/[^0-9]/g, '');
     const durationNum = parseInt(durationRaw) || 10;
     const voiceDuration = durationNum - 1; // Mục tiêu kết thúc trước 1s
-    const maxWords = Math.floor(voiceDuration * 2); // Siết chặt 2 từ/giây để đảm bảo an toàn
+    const maxWords = Math.floor(voiceDuration * 2.2); 
 
     console.log(`[V8-DEBUG] Target Video: ${durationNum}s | Target Audio: ${voiceDuration}s | Max Words: ${maxWords}`);
 
-    const basePrompt = `Bạn là một đạo diễn ẩm thực tài ba.
-NHIỆM VỤ: Tạo nội dung video cho món ăn: "${topic}".
+    // --- SAVE PRODUCT IMAGE IF EXISTS ---
+    let savedProductImageUrl = '';
+    if (productImage && productImage.includes('base64,')) {
+      try {
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        
+        const base64Data = productImage.split('base64,')[1];
+        const ext = productImage.split(';')[0].split('/')[1] || 'png';
+        const fileName = `prod_${Date.now()}.${ext}`;
+        const filePath = path.join(uploadDir, fileName);
+        
+        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        savedProductImageUrl = `/uploads/products/${fileName}`;
+        console.log('[V8-DEBUG] Product image saved:', savedProductImageUrl);
+      } catch (err) {
+        console.error('[V8-DEBUG] Failed to save product image:', err);
+      }
+    }
 
-QUY TẮC PHÂN TÍCH HÌNH ẢNH (CỰC KỲ CHI TIẾT):
-- Bạn hãy soi cực kỹ ảnh mẫu (productImage) được tải lên.
-- Phải xác định rõ HÌNH DẠNG HÌNH HỌC (Vd: Hình tròn hoàn hảo, Hình vuông sắc cạnh, Hình Oval).
-- Phải mô tả HOA VĂN/HỌA TIẾT đặc trưng trên bề mặt (Vd: họa tiết truyền thống, hoa văn in nổi, vỏ bánh chín vàng bóng bẩy).
-- Các đặc điểm này PHẢI được đưa vào technicalKeywords để ép Runway giữ đúng "Thần thái" và "Hình dáng" của sản phẩm gốc, không được để sản phẩm bị biến dạng.
+    const basePrompt = `Bạn là một đạo diễn ẩm thực và điện ảnh chuyên nghiệp.
+NHIỆM VỤ: Tạo nội dung video kịch bản chất lượng cao cho món ăn: "${topic}".
 
-QUY CÁCH NHÂN VẬT & BỐI CẢNH:
-- Nhân vật chính: Giới tính ${characterType}. Mô tả: ${mainCharacter}.
-- Bối cảnh: ${locationContext}.
-- Thể loại video: ${videoGenre}.
+QUY TẮC PHÂN TÍCH HÌNH ẢNH (Image-to-Video Focus):
+- Giữ nguyên hình ảnh 100%: Món ăn TUYỆT ĐỐI KHÔNG ĐƯỢC biến dạng (No deformation), không "tan chảy", không thay đổi hoa văn so với ảnh mẫu.
+- Xác định HÌNH DẠNG HÌNH HỌC (tròn, vuông, khối) và HOA VĂN đặc trưng trên bề mặt để AI Runway tái hiện chính xác nhất.
+- Mô tả chi tiết kết cấu (texture): độ bóng của vỏ, lớp nhân. Chỉ cho phép hiệu ứng ánh sáng hoặc hơi gió/khói cực nhẹ trên bề mặt để đảm bảo sản phẩm đứng yên vững chãi (Static product).
+- Ánh sáng: Đặc tả hướng sáng (vd: side lighting, rim lighting) để làm nổi bật các cạnh của sản phẩm.
+- Camera: Luôn bắt đầu bằng các chuyển động camera mượt mà như "Slow macro tracking", "Gentle push-in" hoặc "Circular orbit".
 
-QUY TẮC BẮT BUỘC VỀ THỜI LƯỢNG (SIÊU CÔ ĐỌNG):
-- Lời thoại (fullAudioScript) PHẢI CỰC KỲ DỨT KHOÁT, ĐẾM KỸ TỪ: TUYỆT ĐỐI KHÔNG ĐƯỢC VƯỢT QUÁ ${maxWords} TỪ. Nếu vượt quá, video sẽ bị hỏng hiệu ứng.
-- Mục tiêu: Tất cả lời thoại phải được đọc hết nhanh chóng trong ${voiceDuration} giây (để dư 1-2 giây im lặng chuyên nghiệp ở cuối).
-- Kịch bản này là DUY NHẤT và sẽ được dùng chung cho mọi kiểu giọng đọc (Bắc/Trung/Nam), nên hãy dùng ngôn ngữ phổ thông, dứt khoát.
-- CHỈ TRẢ VỀ JSON, KHÔNG trả về văn bản dẫn chuyện.
-- Phần visualDescription: Viết lời mô tả hình ảnh CHUYÊN NGHIỆP nhưng THÂN THIỆN, dễ hiểu với người dùng (Tiếng Việt). Luôn bao gồm mô tả về chuyển động của máy quay (VD: "Máy quay từ từ tiến lại gần...", "Lia máy nhẹ nhàng từ trái sang phải...").
-- Phần technicalKeywords: Chứa các từ khóa tiếng Anh chuyên môn để AI tạo video (Runway) đạt hiệu quả cao nhất (Vd: cinematic, 4k, slow zoom in, smooth pan, camera sliding, tracking shot, shallow depth of field).
+QUY CÁCH NHÂN VẬT & BỐI CẢNH (Text-to-Video Focus):
+- Nhân vật: Giới tính ${characterType}. Mô tả: ${mainCharacter}. 
+  + Phải mô tả chi tiết: Ánh mắt rạng rỡ chuyển động linh hoạt, nụ cười tỏa nắng, làn da chân thực (realistic skin texture), biểu cảm khuôn mặt sống động (micro-expressions), gật đầu nhẹ nhàng đầy thân thiện.
+  + Hành động: Cử động môi (lip-sync) khớp lời thoại, cử chỉ tay tự nhiên và đa dạng (Vd: mời khách, chỉ vào món ăn, hoặc thực hiện các thao tác bếp nhẹ nhàng đầy điêu luyện).
+- Bối cảnh: ${locationContext}. Phải mô tả không gian có chiều sâu (depth), ánh sáng môi trường ấm cúng, phông nền mờ ảo.
 
-QUY TẮC PHÂN CẢNH (CỰC KỲ QUAN TRỌNG):
-- Cảnh 1 (Scene 1): LUÔN PHẢI bắt đầu bằng hình ảnh cận cảnh nhân vật chính. Nhân vật phải đang mỉm cười, cử động môi tự nhiên (lip-sync) như đang nói chuyện trực tiếp với camera. Thời lượng cảnh 1 chiếm khoảng 30% video.
-- Các cảnh sau: Thực hiện lia máy (pan), trượt (sliding) hoặc thu phóng (zoom) mượt mà chuyển từ nhân vật sang đặc tả vẻ đẹp của món ăn chính.
-- Biểu cảm: Luôn bao gồm các từ khóa biểu cảm vào technicalKeywords (Vd: lip-syncing, talking to camera, smiling, expressive facial movements).
-- Tuyệt đối không để góc quay tĩnh đứng yên.
-- Luân phiên giữa các góc quay: Close-up (Cận cảnh), Macro (Siêu cận), Cinematic tracking.
-- Chuyển động camera phải mượt mà và tập trung vào vẻ đẹp của món ăn và nhân vật chính.
+QUY TẮC PHÂN BỔ THỜI LƯỢNG (40/60 RULE):
+- Tổng video dài ${durationNum} giây, chia làm ${sceneCount} cảnh.
+- Thời lượng cảnh MÓN ĂN (Product Focus): Phải chiếm khoảng 60% tổng thời gian.
+- Thời lượng cảnh NHÂN VẬT (Character Focus): Phải chiếm khoảng 40% tổng thời gian.
+
+QUY TẮC PHÂN CẢNH (YÊU CẦU CHÍNH XÁC ${sceneCount} CẢNH):
+- Cảnh 1 (Product Focus): Camera Macro quay cận cảnh món ăn bám sát ảnh mẫu 100%. Ánh sáng soft studio lighting, tập trung vào chi tiết tinh xảo nhất.
+- Các cảnh tiếp theo: Lia máy mượt mà để chuyển đổi từ Món ăn sang Nhân vật. Nhân vật xuất hiện trong bối cảnh ${locationContext} sang trọng, giới thiệu món ăn với phong thái chuyên gia.
+
+QUY TẮC BẮT BUỘC VỀ THỜI LƯỢNG LỜI THOẠI:
+- Lời thoại (fullAudioScript): TUYỆT ĐỐI KHÔNG ĐƯỢC ngắn hơn 20 từ và không vượt quá ${maxWords} TỪ.
+- Phong cách: Viết kịch bản kiểu Marketing đầy cảm xúc, có vần điệu, nhịp điệu tiếng Việt bay bổng, tránh viết ngang hoặc liệt kê sự thật khô khan.
+- Mục tiêu: Hoàn tất lời thoại trong ${voiceDuration} giây một cách thong thả, truyền cảm.
+
+QUY CÁCH TRẢ VỀ:
+- CHỈ TRẢ VỀ JSON. Danh sách "scenes" phải có ĐÚNG ${sceneCount} phần tử.
+- visualDescription: MIÊU TẢ CỐT TRUYỆN (Storytelling). Dùng tiếng Việt tự nhiên, giàu sức gợi để người dùng đọc cảm thấy hứng thú. Tuyệt đối KHÔNG chứa các từ khóa kỹ thuật như "Macro", "Panning", "Lip-sync", "Adherence", "Zoom".
+- technicalKeywords: TỪ KHÓA KỸ THUẬT (AI Instructions). Chuyên dùng cho Runway ML. Bao gồm: Camera movement (Macro, Slow tracking, Panning), Animation details (Lip-sync, perfect skin, 100% subject adherence, zero motion on product, realistic textures), Quality keywords (4k, cinematic lighting, shallow depth of field).
+- isProductFocus: Thêm trường boolean này vào mỗi cảnh (true nếu cảnh đó tập trung vào món ăn).
+
 {
-  "fullAudioScript": "Lời thoại dài khoảng ${maxWords} từ. Viết theo phong cách nhân vật đang NÓI CHUYỆN trực tiếp.",
+  "fullAudioScript": "Lời thoại bay bổng, có vần điệu, giàu cảm xúc Marketing (đạt từ 20 đến ${maxWords} từ)...",
   "scenes": [
     {
       "sceneOrder": 1,
-      "title": "Tên cảnh",
-      "visualDescription": "Mô tả hình ảnh (Tiếng Việt). Nhấn mạnh hành động của nhân vật và đặc điểm món ăn.",
-      "technicalKeywords": "Từ khóa kỹ thuật (Tiếng Anh). Bao gồm: 4k, photorealistic, cinematic lighting, high detailed material texture, mouth movement, lip sync."
+      "title": "...",
+      "isProductFocus": true,
+      "visualDescription": "Mô tả một cách gợi cảm hứng bằng tiếng Việt về món ăn... (Không dùng thuật ngữ camera)",
+      "technicalKeywords": "macro, slow tracking, 100% subject adherence, zero motion on product, 4k"
     },
-    ... (đúng số cảnh ${sceneCount})
+    "... (tổng cộng ${sceneCount} cảnh) ..."
   ]
 }
 
-CHÚ Ý: Hãy đảm bảo nhân vật (Giới tính ${characterType}) có hành động và biểu cảm phù hợp với món ăn.`;
+CHÚ Ý: Visual Description phải viết như kể một câu chuyện mượt mà, gợi hình, hoàn toàn bằng tiếng Việt.
+CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adherence) và các ghi chú về khớp môi (Lip-sync) TUYỆT ĐỐI PHẢI nằm trong field technicalKeywords để AI xử lý ngầm, không show lên cho người dùng.`;
 
     if (productImage && productImage.includes('base64,')) {
       const parts = productImage.split('base64,');
@@ -211,7 +242,7 @@ CHÚ Ý: Hãy đảm bảo nhân vật (Giới tính ${characterType}) có hành
         content: {
           scenes,
           fullAudioScript: (scenes as any).fullAudioScript || '',
-          config: { characterId, characterType, mainCharacter, locationContext, videoGenre }
+          config: { characterId, characterType, mainCharacter, locationContext, videoGenre, savedProductImageUrl }
         },
         version: 1,
         isActive: true,

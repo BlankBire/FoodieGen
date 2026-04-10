@@ -23,13 +23,17 @@ async function refineManualScript(rawText: string, apiKey: string) {
   }
 
   const ai = new GoogleGenAI({ apiKey }); 
-  const modelId = 'gemini-2.5-flash'; 
+  const modelId = 'gemini-3.1-flash-lite-preview'; 
   
-  const prompt = `Cải thiện kịch bản quảng cáo đồ ăn sau: "${rawText}". 
-  Hãy giữ nguyên số lượng các phân cảnh, đừng chia nhỏ thêm. 
-  Trả về duy nhất dữ liệu dưới dạng JSON array: [{"sceneOrder":1, "title":"", "visualDescription":"", "audioScript":""}]. 
-  Các mô tả hình ảnh cần cực kỳ chi tiết nhưng lời thoại phải ngắn gọn cho 5 giây.
-  Đảm bảo kịch bản tự nhiên, hài hòa giữa hình ảnh và lời thoại tiếng Việt.`;
+  const prompt = `Bạn là chuyên gia hiệu đính kịch bản điện ảnh. 
+Hãy trau chuốt kịch bản đồ ăn sau thành phiên bản Cinematic chuyên nghiệp nhưng vẫn tự nhiên: "${rawText}".
+
+YÊU CẦU:
+1. Giữ nguyên số lượng các phân cảnh.
+2. visualDescription: Miêu tả cốt truyện một cách mượt mà, gợi hình bằng TIẾNG VIỆT tự nhiên. TUYỆT ĐỐI KHÔNG chứa thuật ngữ tiếng Anh hay chỉ thị camera.
+3. technicalKeywords: Chứa toàn bộ thuật ngữ kỹ thuật tiếng Anh (Vd: macro, panning, rim light, shallow depth of field, lip-sync, high adherence).
+4. Lời thoại (audioScript) phải tự nhiên, cô đọng.
+5. Trả về duy nhất dữ liệu dưới dạng JSON array: [{"sceneOrder":1, "title":"", "visualDescription":"", "audioScript":"", "technicalKeywords":""}].`;
 
   let result;
   let attempts = 0;
@@ -88,7 +92,7 @@ async function generateAudioTask(
   const fptVoice = config?.voiceGender || 'leminh';
   console.log(`[FPT-AI] [TASK] Generating TTS with Voice ID: ${fptVoice}...`);
   const fptApiKey = process.env.FPT_AI_API_KEY;
-  const fptSpeed = Math.floor(((config?.voiceSpeed || 50) / 100) * 6) - 2;
+  const fptSpeed = Math.floor(((config?.voiceSpeed ?? 50) / 100) * 6) - 3;
   
   try {
     const fptRes = await fetch(`https://api.fpt.ai/hmi/tts/v5`, {
@@ -145,7 +149,8 @@ async function generateVideoTask(
   runway: RunwayML,
   visualPrompt: string,
   ratio: string,
-  duration: number
+  duration: number,
+  promptImage?: string
 ) {
   const MODELS_PRIORITY = ['gen4.5', 'gen3a_turbo', 'veo3.1_fast', 'veo3.1', 'veo3'];
   let res: { id: string } | null = null;
@@ -153,13 +158,25 @@ async function generateVideoTask(
   
   for (const mid of MODELS_PRIORITY) {
     try {
-      console.log(`[RUNWAY] [TASK] Model: ${mid} | Duration: ${duration}s | Request Sent...`);
-      res = await (runway.textToVideo as any).create({
+      console.log(`[RUNWAY] [TASK] Model: ${mid} | I2V: ${!!promptImage} | Duration: ${duration}s | Request Sent...`);
+      
+      const payload: any = {
         model: mid,
         promptText: visualPrompt,
         ratio,
-        duration: duration, 
-      });
+        duration: duration,
+      };
+
+      if (promptImage) {
+        payload.promptImage = promptImage;
+        // Search results indicate using client.imageToVideo for I2V
+        // If the current SDK version doesn't have it, we fallback to textToVideo as they often overlap
+        const method = (runway as any).imageToVideo || runway.textToVideo;
+        res = await (method as any).create(payload);
+      } else {
+        res = await (runway.textToVideo as any).create(payload);
+      }
+      
       if (res) break;
     } catch (e: any) {
       lastErr = e;
@@ -262,21 +279,29 @@ export async function POST(req: Request) {
     const targetDur = parseInt(String(config?.duration || '10').replace(/[^0-9]/g, '')) || 10;
     const duration = targetDur;
     
+    const motionIntensity = Number(config?.motionIntensity ?? 50);
+    let motionKeyword = "Subtle micro-movements, high fidelity, stable textures";
+    if (motionIntensity < 30) {
+      motionKeyword = "Extremely stable shot, zero motion on product, locked shape, frozen subject, no morphing";
+    } else if (motionIntensity > 70) {
+      motionKeyword = "Fluid cinematic motion, but maintaining 100% product geometry";
+    }
+
     const combinedVisualPrompt = scenes.map(s => {
       const desc = s.visualDescription || '';
       const kw = s.technicalKeywords || '';
       return `${desc} ${kw}`.trim();
-    }).join(' [TRANSITION] ').substring(0, 1000); 
+    }).join('... then moving the camera fast and zooming out to reveal... ').substring(0, 1000); 
 
     const visualPrompt = [
       `A ${duration}-second cinematic 4k video about ${projectTopic}.`,
+      `Dramatic camera sequence: Start with a macro close-up of the dish, then quickly pull back and zoom out to reveal the character.`,
+      `Motion Profile: ${motionKeyword}. Subject Stability: High.`,
       combinedVisualPrompt,
       `Character Focus: A ${genderInEng} ${mainCharacter}, smiling, speaking directly to camera, vibrant facial expressions.`,
-      `Identical to product image, high shape preservation, perfect symmetry, detailed surface texture, realistic textures.`,
-      `Cinematic camera motion, smooth panning, slow zoom, professional camera tracking, dynamic sweeping shots.`,
-      `Style: ${config?.activeStyle || 'cinematic'}.`,
-      `Vivid colors, cinematic lighting, material texture, sharp focus on the dish and the person.`,
-      `NO smoke, NO noise, high motion but stable professional camera.`
+      `Product Focus: Identical to initial image, extreme precision, no distortion, 100% shape preservation.`,
+      `Style: ${config?.activeStyle || 'cinematic'}, 4k resolution, professional studio lighting.`,
+      `NO melting, NO noise, high motion on camera but internal consistency on product.`
     ].filter(Boolean).join(' ').slice(0, 1000);
 
     const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
@@ -284,12 +309,15 @@ export async function POST(req: Request) {
     const audioFilePath = path.join(audioDir, audioFileName);
     let audioUrl = '';
 
+    // --- SOURCE PRODUCT IMAGE ---
+    const productImage = config?.productImage || configData.savedProductImageUrl;
+
     // --- PARALLEL EXECUTION: AUDIO & VIDEO ---
     console.log('[PIPELINE] Starting Parallel Generation...');
     
     const [audioResultUrl, rawVideoUrl] = await Promise.all([
       generateAudioTask(totalAudioScript, config, finalScriptId, audioDir, audioFilePath),
-      generateVideoTask(runway, visualPrompt, ratio, duration)
+      generateVideoTask(runway, visualPrompt, ratio, duration, productImage)
     ]);
 
     audioUrl = audioResultUrl;
