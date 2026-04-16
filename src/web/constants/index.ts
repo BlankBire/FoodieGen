@@ -73,5 +73,11 @@ export const CHARACTERS = [
     label: 'Nhân vật 3D hoạt hình', 
     gender: 'Nữ',
     defaultDescription: 'Nhân vật 3D phong cách hoạt hình dễ thương, năng động, có những biểu cảm cường điệu vui nhộn, phù hợp cho các quảng cáo sản phẩm trẻ em hoặc đồ ăn nhanh.'
+  },
+  {
+    id: 'custom_character',
+    label: 'Tùy chỉnh nhân vật...',
+    gender: 'Nam',
+    defaultDescription: ''
   }
 ];

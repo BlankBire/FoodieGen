@@ -1,4 +1,6 @@
+import { useState, useRef, useEffect } from 'react';
 import { TONES, CHARACTERS } from '../../constants';
+import { Search, ChevronDown, User, PlusCircle } from 'lucide-react';
 
 interface ContentSectionProps {
   foodTopic: string;
@@ -46,9 +48,15 @@ export const ContentSection = ({
     const char = CHARACTERS.find(c => c.id === charId);
     if (char) {
       setCharacterId(char.id);
-      setCharacterType(char.gender);
-      setVoiceGender(char.gender === 'Nam' ? 'leminh' : 'banmai');
-      setMainCharacter(char.defaultDescription);
+      // Nếu là nhân vật tùy chỉnh, giữ nguyên giới tính hiện tại để người dùng tự chọn tiếp
+      if (char.id !== 'custom_character') {
+        setCharacterType(char.gender);
+        setVoiceGender(char.gender === 'Nam' ? 'leminh' : 'banmai');
+        setMainCharacter(char.defaultDescription);
+      } else {
+        // Clear mô tả khi chuyển sang tùy chỉnh để người dùng nhập mới
+        setMainCharacter('');
+      }
     }
   };
 
@@ -95,6 +103,38 @@ export const ContentSection = ({
             </select>
           </div>
         </div>
+
+        {/* 2.1 Lựa chọn giới tính cho nhân vật tùy chỉnh */}
+        {characterId === 'custom_character' && (
+          <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
+            <label className="form-label">Giới tính nhân vật</label>
+            <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-input)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
+              {['Nam', 'Nữ'].map(g => (
+                <button
+                  key={g}
+                  onClick={() => {
+                    setCharacterType(g);
+                    setVoiceGender(g === 'Nam' ? 'leminh' : 'banmai');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                    background: characterType === g ? 'white' : 'transparent',
+                    color: characterType === g ? 'var(--amber-600)' : 'var(--text-muted)',
+                    boxShadow: characterType === g ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                    border: characterType === g ? '1px solid var(--amber-200)' : '1px solid transparent'
+                  }}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="form-group">
           <label className="form-label">Mô tả nhân vật</label>

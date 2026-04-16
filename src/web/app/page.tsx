@@ -337,6 +337,12 @@ export default function Home() {
       <main className="main-grid-responsive">
         {/* LEFT — Scrollable form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
+
+          <VideoConfigSection 
+            resolution={resolution} setResolution={setResolution}
+            aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+            duration={duration} setDuration={setDuration}
+          />
           
           <ContentSection 
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
@@ -353,12 +359,6 @@ export default function Home() {
             setVideoGenre={setVideoGenre}
             loading={loading}
             setVoiceGender={setVoiceGender}
-          />
-
-          <VideoConfigSection 
-            resolution={resolution} setResolution={setResolution}
-            aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
-            duration={duration} setDuration={setDuration}
           />
 
           <VisualAudioSection 
