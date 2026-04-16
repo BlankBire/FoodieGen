@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const durationRaw = String(body.duration || '10').replace(/[^0-9]/g, '');
     const durationNum = parseInt(durationRaw) || 10;
     const voiceDuration = durationNum - 1; // Mục tiêu kết thúc trước 1s
-    const maxWords = Math.floor(voiceDuration * 2.2); 
+    const maxWords = Math.floor(voiceDuration * 2.5); 
 
     console.log(`[V8-DEBUG] Target Video: ${durationNum}s | Target Audio: ${voiceDuration}s | Max Words: ${maxWords}`);
 
@@ -64,12 +64,16 @@ QUY TẮC PHÂN TÍCH HÌNH ẢNH (Image-to-Video Focus):
 - Xác định HÌNH DẠNG HÌNH HỌC (tròn, vuông, khối) và HOA VĂN đặc trưng trên bề mặt để AI Runway tái hiện chính xác nhất.
 - Mô tả chi tiết kết cấu (texture): độ bóng của vỏ, lớp nhân. Chỉ cho phép hiệu ứng ánh sáng hoặc hơi gió/khói cực nhẹ trên bề mặt để đảm bảo sản phẩm đứng yên vững chãi (Static product).
 - Ánh sáng: Đặc tả hướng sáng (vd: side lighting, rim lighting) để làm nổi bật các cạnh của sản phẩm.
-- Camera: Luôn bắt đầu bằng các chuyển động camera mượt mà như "Slow macro tracking", "Gentle push-in" hoặc "Circular orbit".
+- Camera: Video PHẢI bắt đầu bằng Macro quay món ăn (Product Focus) trong khoảng 40% thời lượng đầu, sau đó BẮT BUỘC thực hiện chuyển động lia máy (pan/tilt) hoặc zoom out mượt mà để tiết lộ nhân vật (Character Reveal) đang đứng giới thiệu món ăn.
+- Luôn đảm bảo cả món ăn và nhân vật cùng xuất hiện hài hòa trong cùng một không gian vật lý, không tách rời.
 
 QUY CÁCH NHÂN VẬT & BỐI CẢNH (Text-to-Video Focus):
 - Nhân vật: Giới tính ${characterType}. Mô tả: ${mainCharacter}. 
-  + Phải mô tả chi tiết: Ánh mắt rạng rỡ chuyển động linh hoạt, nụ cười tỏa nắng, làn da chân thực (realistic skin texture), biểu cảm khuôn mặt sống động (micro-expressions), gật đầu nhẹ nhàng đầy thân thiện.
-  + Hành động: Cử động môi (lip-sync) khớp lời thoại, cử chỉ tay tự nhiên và đa dạng (Vd: mời khách, chỉ vào món ăn, hoặc thực hiện các thao tác bếp nhẹ nhàng đầy điêu luyện).
+  + QUY TẮC PERSONA (Custom Character Handling): Nếu đây là nhân vật tùy chỉnh (không theo mẫu có sẵn), AI phải thực hiện: 
+    1. Tự đặt một "Tên Vai Diễn" ngắn gọn dựa trên mô tả (Vd: "Võ sư", "Bà lão", "Phi hành gia").
+    2. Trích xuất CỰC KỲ CHI TIẾT diện mạo: Độ tuổi, trang phục (màu sắc, chất liệu), phụ kiện (kính, mũ), và thần thái (vui vẻ, uy nghiêm).
+    3. Sử dụng "Tên Vai Diễn" và các đặc điểm ngoại hình này một cách nhất quán (Logical Consistency) trong TẤT CẢ các phân cảnh.
+  + Đặc tả khuôn mặt & Hành động: Nhân vật PHẢI đang thực hiện hành động NÓI (speaking/introducing) một cách tự nhiên và nhiệt huyết. Ánh mắt rạng rỡ chuyển động linh hoạt, làn da chân thực (realistic skin texture), biểu cảm khuôn mặt sống động (micro-expressions), cử động miệng (active jaw movement, visible speech) khớp lời thoại, cử chỉ tay tự nhiên khi giới thiệu sản phẩm. TUYỆT ĐỐI KHÔNG để nhân vật chỉ đứng cười mỉm môi.
 - Bối cảnh: ${locationContext}. Phải mô tả không gian có chiều sâu (depth), ánh sáng môi trường ấm cúng, phông nền mờ ảo.
 
 QUY TẮC PHÂN BỔ THỜI LƯỢNG (40/60 RULE):
@@ -78,18 +82,19 @@ QUY TẮC PHÂN BỔ THỜI LƯỢNG (40/60 RULE):
 - Thời lượng cảnh NHÂN VẬT (Character Focus): Phải chiếm khoảng 40% tổng thời gian.
 
 QUY TẮC PHÂN CẢNH (YÊU CẦU CHÍNH XÁC ${sceneCount} CẢNH):
-- Cảnh 1 (Product Focus): Camera Macro quay cận cảnh món ăn bám sát ảnh mẫu 100%. Ánh sáng soft studio lighting, tập trung vào chi tiết tinh xảo nhất.
-- Các cảnh tiếp theo: Lia máy mượt mà để chuyển đổi từ Món ăn sang Nhân vật. Nhân vật xuất hiện trong bối cảnh ${locationContext} sang trọng, giới thiệu món ăn với phong thái chuyên gia.
+- Cảnh 1 (Product Focus): Camera Macro quay cận cảnh món ăn bám sát ảnh mẫu 100% (No deformation). Ánh sáng soft studio lighting, tập trung vào chi tiết tinh xảo.
+- Các cảnh tiếp theo: TUYỆT ĐỐI PHẢI lia máy mượt mà để tiết lộ nhân vật chính (${mainCharacter}) đang giới thiệu món ăn. Nhân vật xuất hiện trong bối cảnh ${locationContext}, nói chuyện tự nhiên (active talking persona) và giới thiệu món bánh trung thu một cách mời chào.
 
 QUY TẮC BẮT BUỘC VỀ THỜI LƯỢNG LỜI THOẠI:
 - Lời thoại (fullAudioScript): TUYỆT ĐỐI KHÔNG ĐƯỢC ngắn hơn 20 từ và không vượt quá ${maxWords} TỪ.
 - Phong cách: Viết kịch bản kiểu Marketing đầy cảm xúc, có vần điệu, nhịp điệu tiếng Việt bay bổng, tránh viết ngang hoặc liệt kê sự thật khô khan.
+- Nhấn mạnh THƯƠNG HIỆU: Luôn lồng ghép TÊN THƯƠNG HIỆU hoặc LOGO (nếu phát hiện được từ ảnh) vào lời thoại một cách trang trọng, tự hào và đầy cảm xúc. Đây là yếu tố sống còn của video quảng cáo.
 - Mục tiêu: Hoàn tất lời thoại trong ${voiceDuration} giây một cách thong thả, truyền cảm.
 
 QUY CÁCH TRẢ VỀ:
 - CHỈ TRẢ VỀ JSON. Danh sách "scenes" phải có ĐÚNG ${sceneCount} phần tử.
 - visualDescription: MIÊU TẢ CỐT TRUYỆN (Storytelling). Dùng tiếng Việt tự nhiên, giàu sức gợi để người dùng đọc cảm thấy hứng thú. Tuyệt đối KHÔNG chứa các từ khóa kỹ thuật như "Macro", "Panning", "Lip-sync", "Adherence", "Zoom".
-- technicalKeywords: TỪ KHÓA KỸ THUẬT (AI Instructions). Chuyên dùng cho Runway ML. Bao gồm: Camera movement (Macro, Slow tracking, Panning), Animation details (Lip-sync, perfect skin, 100% subject adherence, zero motion on product, realistic textures), Quality keywords (4k, cinematic lighting, shallow depth of field).
+- technicalKeywords: TỪ KHÓA KỸ THUẬT (AI Instructions). Chuyên dùng cho Runway ML. Bao gồm: Camera sequence (Macro start then smooth pan to reveal character), Animation details (Active mouth movement, speaking naturally, high adherence to source image, locked product geometry, rigid object consistency), Quality keywords (4k, cinematic lighting, shallow depth of field).
 - isProductFocus: Thêm trường boolean này vào mỗi cảnh (true nếu cảnh đó tập trung vào món ăn).
 
 {
@@ -107,7 +112,14 @@ QUY CÁCH TRẢ VỀ:
 }
 
 CHÚ Ý: Visual Description phải viết như kể một câu chuyện mượt mà, gợi hình, hoàn toàn bằng tiếng Việt.
-CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adherence) và các ghi chú về khớp môi (Lip-sync) TUYỆT ĐỐI PHẢI nằm trong field technicalKeywords để AI xử lý ngầm, không show lên cho người dùng.`;
+CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adherence) và các ghi chú về khớp môi (Lip-sync) TUYỆT ĐỐI PHẢI nằm trong field technicalKeywords để AI xử lý ngầm, không show lên cho người dùng.
+
+  ADDITIONAL RULE: Strict invitation/conclusion phrasing
+  Ensure the final invitation sentence (kết thúc lời thoại) is a professional,
+  grammatically complete Vietnamese sentence (subject + predicate).
+  Example of the required style: "Mời mọi người cùng [Thương hiệu] thưởng thức...".
+  Do NOT end with fragments, colloquial ellipses, or imperative fragments lacking a subject.
+  The invitation must reference the brand when available and be polite, complete, and marketing-appropriate.`;
 
     if (productImage && productImage.includes('base64,')) {
       const parts = productImage.split('base64,');
@@ -119,9 +131,12 @@ CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adheren
 1. Đầu tiên, hãy kiểm tra xem hình ảnh đó có phải là đồ ăn không. Nếu KHÔNG PHẢI đồ ăn, thêm "warning": "Ảnh không phải đồ ăn" vào JSON.
 2. Nếu LÀ ĐỒ ĂN: Hãy phân tích CỰC KỲ CHI TIẾT các yếu tố sau và đưa vào visualDescription của TẤT CẢ các cảnh:
    - Hình dạng hình học chính xác (Vd: bánh hình tròn hoản hảo, hình trụ, hình cầu...). Tuyệt đối giữ đúng hình dạng này (Vd: tròn thì không được tả thành oval). Càng giống ảnh mẫu càng tốt.
-   - Chi tiết bề mặt: Các hoa văn chạm khắc trên bánh, logo, độ bóng của vỏ, các lớp nhân.
+   - Nhận diện THƯƠNG HIỆU: Tìm kiếm TÊN THƯƠNG HIỆU, LOGO hoặc các ký tự được chạm khắc/in trên bề mặt món ăn (đặc biệt là trên bánh trung thu).
+   - Chi tiết bề mặt: Các hoa văn chạm khắc, độ bóng của vỏ, các lớp nhân.
    - Màu sắc: Tông màu chủ đạo chính xác của ảnh mẫu.
-3. Đảm bảo nhân vật chính trong kịch bản (${mainCharacter}) tương tác hoặc giới thiệu món ăn này sao cho bám sát các đặc điểm thật đã phân tích được.` },
+3. QUY TẮC LỜI THOẠI (BRAND-HEAVY): Nếu phát hiện ra tên thương hiệu hoặc logo, bạn phải đưa tên thương hiệu đó vào "fullAudioScript" một cách tự nhiên nhưng nổi bật (Vd: "Thưởng thức vị ngon từ [Tên thương hiệu]...").
+4. Đảm bảo nhân vật chính trong kịch bản (${mainCharacter}) tương tác hoặc giới thiệu món ăn này sao cho bám sát các đặc điểm thật đã phân tích được.
+` },
         {
           inlineData: {
             data: base64Data,
