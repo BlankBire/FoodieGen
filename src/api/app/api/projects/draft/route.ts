@@ -42,14 +42,14 @@ export async function POST(req: Request) {
       script = await prisma.videoScript.update({
         where: { id: scriptId },
         data: {
-          content: contentPayload as any,
+          content: JSON.stringify(contentPayload),
         },
       });
     } else {
       script = await prisma.videoScript.create({
         data: {
           projectId: project.id,
-          content: contentPayload as any,
+          content: JSON.stringify(contentPayload),
           isActive: true,
         },
       });

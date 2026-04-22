@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   );
   response.headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-google-api-key, x-runway-api-key, x-fpt-api-key",
+    "Content-Type, Authorization, x-google-api-key, x-runway-api-key, x-fpt-api-key, x-kling-access-key, x-kling-secret-key",
   );
 
   // Handle preflight requests

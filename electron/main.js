@@ -90,6 +90,27 @@ function startApiServer() {
       ? path.join(resourcesPath, "src", "api")
       : path.join(resourcesPath, "api-server");
 
+    // Đảm bảo thư mục public tồn tại (vì chúng ta đã loại bỏ nó khỏi bản build)
+    const publicDir = path.join(apiDir, "public");
+    const requiredSubDirs = ["audio", "videos", "uploads"];
+    
+    try {
+      if (!fs.existsSync(publicDir)) {
+        console.log("[MAIN] Creating missing public directory at:", publicDir);
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+      
+      requiredSubDirs.forEach(sub => {
+        const subPath = path.join(publicDir, sub);
+        if (!fs.existsSync(subPath)) {
+          console.log(`[MAIN] Initializing subdirectory: ${sub}`);
+          fs.mkdirSync(subPath, { recursive: true });
+        }
+      });
+    } catch (err) {
+      console.error("[MAIN] Failed to create public directories:", err);
+    }
+
     // Tìm Engine Prisma
     const binEngineName = "query-engine-windows.exe";
     const resolvedPrismaEngine = path.join(resourcesPath, "prisma", binEngineName);
@@ -212,9 +233,7 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
-    icon: isDev
-      ? path.join(__dirname, "../src/web/public/logo.png")
-      : path.join(process.resourcesPath, "app/src/web/public/logo.png"),
+    icon: path.join(__dirname, "..", "src", "web", "public", "logo.png"),
     title: "FoodieGen - AI Video Generator",
   });
 

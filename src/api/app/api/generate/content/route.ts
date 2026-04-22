@@ -5,9 +5,8 @@ import prisma from "../../../../lib/prisma";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import os from "os";
 
-const DEBUG_LOG = path.join(os.tmpdir(), "foodiegen-debug.log");
+const DEBUG_LOG = path.join(process.cwd(), "foodiegen-debug.log");
 function appendDebug(...args: any[]) {
   try {
     const line =
@@ -73,21 +72,35 @@ export async function POST(req: Request) {
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
     const modelId = "gemini-3.1-flash-lite-preview";
 
     let promptParts: any[] = [];
 
+    const isMarketingMode = !!body.isMarketingMode;
+    const referenceDoc = body.referenceDoc || "";
+    
     const sceneCountStr = String(numScenes || "2 cảnh");
-    const sceneCount = parseInt(sceneCountStr.replace(/[^0-9]/g, "")) || 2;
+    let sceneCount = parseInt(sceneCountStr.replace(/[^0-9]/g, "")) || 2;
+    
+    // Nếu là chế độ Marketing, ép số cảnh lên 7 để đảm bảo thời lượng 60-90s
+    if (isMarketingMode) {
+      sceneCount = 7;
+    }
 
     const durationRaw = String(body.duration || "10").replace(/[^0-9]/g, "");
-    const durationNum = parseInt(durationRaw) || 10;
-    const voiceDuration = durationNum - 1; // Mục tiêu kết thúc trước 1s
+    let durationNum = parseInt(durationRaw) || 10;
+    
+    // Nếu là chế độ Marketing, thời lượng mục tiêu là 60-90s
+    if (isMarketingMode) {
+      durationNum = 75; // Trung bình 75s
+    }
+
+    const voiceDuration = durationNum - 1; 
     const maxWords = Math.floor(voiceDuration * 2.5);
 
     console.log(
-      `[V8-DEBUG] Target Video: ${durationNum}s | Target Audio: ${voiceDuration}s | Max Words: ${maxWords}`,
+      `[V8-DEBUG] Mode: ${isMarketingMode ? 'MARKETING' : 'CREATIVE'} | Target Video: ${durationNum}s | Max Words: ${maxWords}`,
     );
 
     // --- SAVE PRODUCT IMAGE IF EXISTS ---
@@ -95,8 +108,8 @@ export async function POST(req: Request) {
     if (productImage && productImage.includes("base64,")) {
       try {
         const uploadDir = path.join(
-          os.tmpdir(),
-          "foodiegen",
+          process.cwd(),
+          "public",
           "uploads",
           "products",
         );
@@ -116,7 +129,44 @@ export async function POST(req: Request) {
       }
     }
 
-    const basePrompt = `Bạn là một đạo diễn ẩm thực và điện ảnh chuyên nghiệp.
+    let basePrompt = "";
+    
+    if (isMarketingMode) {
+      basePrompt = `Bạn là chuyên gia Marketing Video và Biên kịch quảng cáo chuyên nghiệp.
+NHIỆM VỤ: Chuyển đổi nội dung tài liệu sau đây thành một kịch bản video Marketing đỉnh cao: "${referenceDoc}".
+
+YÊU CẦU CẤU TRÚC KỊCH BẢN (60-90 GIÂY):
+1. HOOK (3 giây đầu): Phải cực kỳ gây tò mò, đánh vào nỗi đau hoặc khát khao của khách hàng để họ không lướt qua.
+2. NỘI DUNG CHÍNH (Body): Trình bày các giá trị cốt lõi, lợi ích của sản phẩm/món ăn một cách mạch lạc, chia thành từng phân đoạn ngắn gọn, súc tích.
+3. CTA (Call to Action): Kết thúc bằng một lời kêu gọi hành động mạnh mẽ, rõ ràng (Vd: Mua ngay, Ghé quán ngay, Inbox để nhận ưu đãi).
+
+QUY TẮC PHÂN CẢNH (YÊU CẦU CHÍNH XÁC ${sceneCount} CẢNH):
+- Các cảnh phải có sự tiếp nối logic. 
+- Sử dụng nhân vật (${mainCharacter}) làm người dẫn dắt (Host) xuyên suốt.
+- Đặc tả hành động nhân vật: Đang nói chuyện nhiệt huyết (active talking), sử dụng ngôn ngữ cơ thể, tương tác với sản phẩm.
+
+QUY TẮC LỜI THOẠI:
+- Lời thoại (fullAudioScript): Phải dài từ 150 đến ${maxWords} từ để đảm bảo thời lượng 60-90s.
+- Ngôn ngữ: Tự nhiên, thuyết phục, đậm chất quảng cáo truyền cảm hứng.
+
+TOKEN TRẢ VỀ (JSON ONLY):
+{
+  "fullNaturalLanguageScript": "[Cảnh 1: ...] Lời thoại... [Cảnh 2: ...] Lời thoại...",
+  "fullAudioScript": "Mẫu lời thoại chỉ chứa text để TTS...",
+  "scenes": [
+    {
+      "sceneOrder": 1,
+      "title": "HOOK: [Tên tiêu đề]",
+      "isProductFocus": true,
+      "visualDescription": "Miêu tả cảnh quay...",
+      "technicalKeywords": "camera move, active mouth movement, cinematic lighting, 4k"
+    },
+    "... (đủ ${sceneCount} cảnh) ..."
+  ]
+}
+`;
+    } else {
+      basePrompt = `Bạn là một đạo diễn ẩm thực và điện ảnh chuyên nghiệp.
 NHIỆM VỤ: Tạo nội dung video kịch bản chất lượng cao cho món ăn: "${topic}".
 
 QUY TẮC PHÂN TÍCH HÌNH ẢNH (Image-to-Video Focus):
@@ -158,7 +208,8 @@ QUY CÁCH TRẢ VỀ:
 - isProductFocus: Thêm trường boolean này vào mỗi cảnh (true nếu cảnh đó tập trung vào món ăn).
 
 {
-  "fullAudioScript": "Lời thoại bay bổng, có vần điệu, giàu cảm xúc Marketing (đạt từ 20 đến ${maxWords} từ)...",
+  "fullNaturalLanguageScript": "BẮT BUỘC: Viết kịch bản theo phong cách kể chuyện (Storytelling) dài và chi tiết. Cấu trúc phải là: [Cảnh 1: Mô tả bối cảnh, hành động nhân vật một cách giàu hình ảnh] + Lời thoại Marketing tương ứng. [Cảnh 2: ...] + Lời thoại... Tiếp tục cho đến hết ${sceneCount} cảnh. Tuyệt đối không dùng thuật ngữ kỹ thuật ở đây.",
+  "fullAudioScript": "Lời thoại Marketing thuần túy để đọc (Voice-over) cho toàn bộ video, đạt từ 20 đến ${maxWords} từ...",
   "scenes": [
     {
       "sceneOrder": 1,
@@ -166,20 +217,27 @@ QUY CÁCH TRẢ VỀ:
       "isProductFocus": true,
       "visualDescription": "Mô tả một cách gợi cảm hứng bằng tiếng Việt về món ăn... (Không dùng thuật ngữ camera)",
       "technicalKeywords": "macro, slow tracking, 100% subject adherence, zero motion on product, 4k"
-    },
+    }
     "... (tổng cộng ${sceneCount} cảnh) ..."
   ]
 }
 
+QUY TẮC VỀ ĐỘ DÀI:
+- Bản fullNaturalLanguageScript phải giàu tính gợi hình, độ dài tối thiểu 100 từ.
+- Mỗi phân cảnh PHẢI bắt đầu bằng thẻ [Cảnh X] trong văn bản.
+`;
+    }
+
+    basePrompt += `
 CHÚ Ý: Visual Description phải viết như kể một câu chuyện mượt mà, gợi hình, hoàn toàn bằng tiếng Việt.
 CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adherence) và các ghi chú về khớp môi (Lip-sync) TUYỆT ĐỐI PHẢI nằm trong field technicalKeywords để AI xử lý ngầm, không show lên cho người dùng.
 
-  ADDITIONAL RULE: Strict invitation/conclusion phrasing
-  Ensure the final invitation sentence (kết thúc lời thoại) is a professional,
-  grammatically complete Vietnamese sentence (subject + predicate).
-  Example of the required style: "Mời mọi người cùng [Thương hiệu] thưởng thức...".
-  Do NOT end with fragments, colloquial ellipses, or imperative fragments lacking a subject.
-  The invitation must reference the brand when available and be polite, complete, and marketing-appropriate.`;
+ADDITIONAL RULE: Strict invitation/conclusion phrasing
+Ensure the final invitation sentence (kết thúc lời thoại) is a professional,
+grammatically complete Vietnamese sentence (subject + predicate).
+Example of the required style: "Mời mọi người cùng [Thương hiệu] thưởng thức...".
+Do NOT end with fragments, colloquial ellipses, or imperative fragments lacking a subject.
+The invitation must reference the brand when available and be polite, complete, and marketing-appropriate.`;
 
     if (productImage && productImage.includes("base64,")) {
       const parts = productImage.split("base64,");
@@ -289,13 +347,15 @@ CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adheren
       .trim();
     let scenes = [];
     let warning = null;
+    let fullAudioScript = "";
+    let fullNaturalLanguageScript = "";
 
     try {
       const parsed = JSON.parse(jsonString);
       if (parsed.scenes && Array.isArray(parsed.scenes)) {
         scenes = parsed.scenes;
-        // Carry over properties for immediate return
-        (scenes as any).fullAudioScript = parsed.fullAudioScript || "";
+        fullAudioScript = parsed.fullAudioScript || "";
+        fullNaturalLanguageScript = parsed.fullNaturalLanguageScript || "";
         warning = parsed.warning;
       } else {
         scenes = Array.isArray(parsed) ? parsed : [parsed];
@@ -350,7 +410,8 @@ CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adheren
         projectId,
         content: JSON.stringify({
           scenes,
-          fullAudioScript: (scenes as any).fullAudioScript || "",
+          fullAudioScript,
+          fullNaturalLanguageScript,
           config: {
             characterId,
             characterType,
@@ -370,8 +431,9 @@ CHÚ Ý: Toàn bộ thuật ngữ tiếng Anh, tỷ lệ % trung thực (Adheren
       projectId,
       scriptId: script.id,
       scenes,
-      fullAudioScript: (scenes as any).fullAudioScript || "",
-      warning: warning || result.__forced_warning,
+      fullAudioScript,
+      fullNaturalLanguageScript: fullNaturalLanguageScript || fullAudioScript,
+      warning: warning || (result as any)?.__forced_warning,
     });
   } catch (error: any) {
     console.error("[V8-CRITICAL] API Error:", error);

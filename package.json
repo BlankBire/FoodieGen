@@ -37,12 +37,12 @@
   "build": {
     "appId": "com.foodiegen.app",
     "productName": "FoodieGen",
-    "asar": true,
-    "asarUnpack": [],
+    "icon": "src/web/public/logo.png",
     "files": [
       "electron/main.js",
       "electron/preload.js",
       "src/web/out/**/*",
+      "src/web/public/logo.png",
       "package.json"
     ],
     "extraResources": [
@@ -67,12 +67,9 @@
         "to": "prisma/vcruntime140_1.dll"
       },
       {
-        "from": "node_modules/.prisma",
-        "to": "node_modules/.prisma"
-      },
-      {
         "from": "src/api/.next/standalone/src/api",
-        "to": "api-server"
+        "to": "api-server",
+        "filter": ["!**/.env", "!public"]
       },
       {
         "from": "src/api/.next/standalone/node_modules",
@@ -81,10 +78,6 @@
       {
         "from": "src/api/.next/static",
         "to": "api-server/.next/static"
-      },
-      {
-        "from": "src/api/public",
-        "to": "api-server/public"
       }
     ],
     "win": {

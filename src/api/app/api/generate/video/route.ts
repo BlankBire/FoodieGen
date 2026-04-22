@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import RunwayML from '@runwayml/sdk';
 import { GoogleGenAI } from '@google/genai';
+import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import { CHARACTERS, VOICES } from '../../../../lib/constants';
@@ -10,7 +11,7 @@ import { CHARACTERS, VOICES } from '../../../../lib/constants';
  * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
  * Chuyển sang v1 để tránh lỗi 404 v1beta.
  */
-async function refineManualScript(rawText: string, apiKey: string) {
+async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s') {
   // --- TỐI ƯU HÓA: Bỏ qua Gemini nếu rawText đã là JSON hợp lệ ---
   try {
     const parsed = JSON.parse(rawText);
@@ -29,7 +30,7 @@ async function refineManualScript(rawText: string, apiKey: string) {
 Hãy trau chuốt kịch bản đồ ăn sau thành phiên bản Cinematic chuyên nghiệp nhưng vẫn tự nhiên: "${rawText}".
 
 YÊU CẦU:
-1. Giữ nguyên số lượng các phân cảnh.
+1. Video này có thời lượng mục tiêu là ${targetDuration}. Hãy phân tách nội dung gốc thành số lượng cảnh quay hợp lý để phủ kín thời lượng này (Ví dụ: Video 15-30s cần khoảng 3-5 cảnh, Video 3-5 phút cần ít nhất 7-10 cảnh trở lên).
 2. visualDescription: Miêu tả cốt truyện một cách mượt mà, gợi hình bằng TIẾNG VIỆT tự nhiên. TUYỆT ĐỐI KHÔNG chứa thuật ngữ tiếng Anh hay chỉ thị camera.
 3. technicalKeywords: Chứa toàn bộ thuật ngữ kỹ thuật tiếng Anh (Vd: macro, panning, rim light, shallow depth of field, lip-sync, active mouth movement, strict physical realism, gravity-aware, rigid object consistency, high adherence).
 4. Lời thoại (audioScript) phải tự nhiên, cô đọng. ĐẶC BIỆT: Phải giữ nguyên và lồng ghép TÊN THƯƠNG HIỆU một cách trang trọng nếu kịch bản gốc có nhắc tới.
@@ -60,7 +61,7 @@ YÊU CẦU:
 
       if (is429 && attempts < maxAttempts) {
         console.warn(`[GEMINI-RATE-LIMIT] 429 Quota Exceeded. Waiting 60s before retry...`);
-        await new Promise(r => setTimeout(r, 60000)); // Đợi 60 giây theo yêu cầu của Google
+        await new Promise(r => setTimeout(r, 60000)); 
         continue;
       }
       
@@ -199,6 +200,156 @@ async function generateVideoTask(
   throw new Error(`Runway task failed: ${task.status}`);
 }
 
+/**
+ * Tạo JWT Token cho Kling AI
+ */
+function generateKlingToken(accessKey: string, secretKey: string) {
+  const payload = {
+    iss: accessKey,
+    exp: Math.floor(Date.now() / 1000) + 1800,
+    nbf: Math.floor(Date.now() / 1000) - 5
+  };
+  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+}
+
+/**
+ * Xử lý tạo video bằng Kling AI (T2V & I2V)
+ */
+async function generateKlingVideoTask(
+  token: string,
+  visualPrompt: string,
+  ratio: string,
+  duration: number,
+  promptImage?: string
+) {
+  const endpoint = promptImage 
+    ? 'https://api.klingai.com/v1/videos/image2video'
+    : 'https://api.klingai.com/v1/videos/text2video';
+
+  const body: any = {
+    model: 'kling-v3', // Sử dụng model v3 mới nhất
+    prompt: visualPrompt,
+    aspect_ratio: ratio === '1280:768' ? '16:9' : '9:16',
+    duration: duration === 5 ? '5' : '10',
+    mode: 'std', // Mặc định chế độ cân bằng như yêu cầu
+  };
+
+  if (promptImage) {
+    // Kling mong muốn URL ảnh hoặc base64 tùy phiên bản, 
+    // ở đây giả định là URL đã được xử lý từ frontend
+    body.image = promptImage;
+  }
+
+  console.log(`[KLING] [TASK] Model: ${body.model} | I2V: ${!!promptImage} | Request Sent...`);
+
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const data = await resp.json();
+  if (data.code !== 0) throw new Error(`Kling API Error: ${data.message}`);
+
+  const taskId = data.data.task_id;
+  
+  // Polling trạng thái task
+  let taskStatus = 'QUEUED';
+  let videoUrl = '';
+  let attempts = 0;
+
+  while (attempts < 60) { // Tối đa 5 phút (60 * 5s)
+    await new Promise(r => setTimeout(r, 5000));
+    const statusResp = await fetch(`https://api.klingai.com/v1/videos/tasks/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const statusData = await statusResp.json();
+    
+    if (statusData.code !== 0) throw new Error(`Kling Query Error: ${statusData.message}`);
+    
+    taskStatus = statusData.data.task_status;
+    if (taskStatus === 'SUCCEEDED') {
+      videoUrl = statusData.data.task_result.videos[0].url;
+      break;
+    } else if (taskStatus === 'FAILED') {
+      throw new Error(`Kling task failed: ${statusData.data.task_status_msg}`);
+    }
+    attempts++;
+  }
+
+  if (!videoUrl) throw new Error('Kling generation timed out');
+  return videoUrl;
+}
+
+/**
+ * Xử lý tạo video bằng Google Veo 3.1 Fast (T2V & I2V)
+ */
+async function generateVeoVideoTask(
+  apiKey: string,
+  visualPrompt: string,
+  ratio: string,
+  duration: number,
+  promptImage?: string
+) {
+  const modelId = 'veo-3.1-generate-001';
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateVideo?key=${apiKey}`;
+
+  const body: any = {
+    prompt: visualPrompt,
+    videoConfig: {
+      durationSeconds: duration,
+      aspectRatio: ratio === '1280:768' ? '16:9' : '9:16',
+    }
+  };
+
+  if (promptImage) {
+    const mimeMatch = promptImage.match(/^data:([^;]+);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    body.imageInput = {
+      image: {
+        mimeType: mimeType,
+        data: promptImage.includes('base64,') ? promptImage.split('base64,')[1] : promptImage,
+      }
+    };
+  }
+
+  console.log(`[VEO] [TASK] Model: ${modelId} | I2V: ${!!promptImage} | Duration: ${duration}s | Request Sent...`);
+
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  const data = await resp.json();
+  if (data.error) throw new Error(`Veo API Error: ${data.error.message}`);
+
+  const operationName = data.name;
+  let videoUrl = '';
+  let attempts = 0;
+
+  while (attempts < 60) {
+    await new Promise(r => setTimeout(r, 5000));
+    const statusResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`);
+    const statusData = await statusResp.json();
+
+    if (statusData.error) throw new Error(`Veo Query Error: ${statusData.error.message}`);
+
+    if (statusData.done) {
+      videoUrl = statusData.response?.video?.uri || statusData.response?.outputUri;
+      break;
+    }
+    attempts++;
+  }
+
+  if (!videoUrl) throw new Error('Veo generation timed out');
+  return videoUrl;
+}
+
+
 export async function POST(req: Request) {
   try {
     const { scriptId: inputScriptId, manualScript, config } = await req.json();
@@ -206,10 +357,20 @@ export async function POST(req: Request) {
     const runwayApiKey = req.headers.get('x-runway-api-key');
     const googleApiKey = req.headers.get('x-google-api-key');
     const fptApiKey = req.headers.get('x-fpt-api-key');
+    const klingAccessKey = req.headers.get('x-kling-access-key');
+    const klingSecretKey = req.headers.get('x-kling-secret-key');
     const hfApiKey = process.env.HUGGINGFACE_API_KEY;
 
-    if (!runwayApiKey || !googleApiKey || !fptApiKey) {
-      throw new Error('Vui lòng cấu hình đầy đủ API Key (Runway, Google, FPT) trong phần Cài đặt.');
+    if (!googleApiKey || !fptApiKey) {
+      throw new Error('Vui lòng cấu hình đầy đủ API Key (Google, FPT) trong phần Cài đặt.');
+    }
+    
+    const selectedModel = config?.model || 'runway';
+    if (selectedModel === 'runway' && !runwayApiKey) {
+      throw new Error('Vui lòng cấu hình RunwayML API Key.');
+    }
+    if (selectedModel === 'kling' && (!klingAccessKey || !klingSecretKey)) {
+      throw new Error('Vui lòng cấu hình Kling AI Access Key và Secret Key.');
     }
     
     let script: any = null;
@@ -225,9 +386,12 @@ export async function POST(req: Request) {
     let scenes: any[] = [];
     let fullAudioScript = '';
     const defaultProjectId = '123e4567-e89b-12d3-a456-426614174000';
+    
+    // --- DURATION LOGIC (STITCHING) - Moved up ---
+    const durationStr = String(config?.duration || '10s');
 
      if (manualScript && manualScript.trim()) {
-        scenes = await refineManualScript(manualScript, googleApiKey || '');
+        scenes = await refineManualScript(manualScript, googleApiKey || '', durationStr);
         const newScript = await prisma.videoScript.create({
           data: {
               project: { connect: { id: script?.projectId || defaultProjectId } },
@@ -278,109 +442,159 @@ export async function POST(req: Request) {
     const characterId = configData.characterId || '';
     const characterType = configData.characterType || '';
     const mainCharacter = configData.mainCharacter || 'chef';
-    
+    const locationContext = configData.locationContext || 'kitchen';
+
     // --- SOURCE OF TRUTH: Lookup gender from CHARACTERS constant ---
     const charDefinition = CHARACTERS.find((c: any) => c.id === characterId);
     const resolvedGender = charDefinition?.gender || characterType; 
     const genderInEng = resolvedGender === 'Nam' ? 'Male' : (resolvedGender === 'Nữ' ? 'Female' : '');
 
-    const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
-    const targetDur = parseInt(String(config?.duration || '10').replace(/[^0-9]/g, '')) || 10;
-    // Runway Gen-3 Alpha Turbo chỉ hỗ trợ 5s hoặc 10s
-    const duration = targetDur <= 7 ? 5 : 10;
+    // --- DURATION LOGIC (STITCHING) ---
+    let totalSeconds = 10;
+    if (durationStr.includes('m')) totalSeconds = parseInt(durationStr) * 60;
+    else totalSeconds = parseInt(durationStr) || 10;
+
+    const maxClipDur = selectedModel === 'veo' ? 8 : 10;
+    const numClips = Math.ceil(totalSeconds / maxClipDur);
+    const clipsConfig = [];
     
-    const motionIntensity = Number(config?.motionIntensity ?? 50);
-    let motionKeyword = "Subtle micro-movements, high fidelity, stable textures, locked geometry, anchor product position";
-    if (motionIntensity < 30) {
-      motionKeyword = "Extremely stable shot, zero motion on product, locked shape, frozen subject, no morphing";
-    } else if (motionIntensity > 70) {
-      motionKeyword = "Fluid cinematic motion, but maintaining 100% product geometry";
+    for (let i = 0; i < numClips; i++) {
+        let clipDur = maxClipDur;
+        if (i === numClips - 1) {
+            const remaining = totalSeconds % maxClipDur;
+            clipDur = remaining === 0 ? maxClipDur : remaining;
+            // Runway/Kling only support 5 or 10. Round up.
+            if (selectedModel !== 'veo') {
+                clipDur = clipDur <= 5 ? 5 : 10;
+            }
+        }
+        clipsConfig.push({ index: i, duration: clipDur });
     }
 
-    const combinedVisualPrompt = scenes.map(s => {
-      const desc = s.visualDescription || '';
-      const kw = s.technicalKeywords || '';
-      return `${desc} ${kw}`.trim();
-    }).join('... smoothly transitioning to... ').substring(0, 1000); 
-
-    const visualPrompt = [
-      `A ${duration}-second cinematic 4k video about ${projectTopic}.`,
-      `Camera Sequence: Start with a high-fidelity macro close-up of the food, then after a few seconds, seamlessly pan and zoom out to reveal the character. Both must remain clear and stable.`,
-      `Physics & Realism: Strict physical realism, obey gravity, no hovering objects, objects must be resting on surfaces or held firmly.`,
-      combinedVisualPrompt,
-      `Character Focus: A ${genderInEng} ${mainCharacter}, actively speaking and introducing the product with expressive lip-sync and pronounced jaw movement (not just smiling), professional host persona, visible speech, interactive gestures.`,
-      `Product Focus (I2V Adherence): Ultra-high adherence to source image, 100% rigid object consistency, locked pixels, no morphing, no stretching, zero product deformation during camera moves.`,
-      `Motion Profile: ${motionKeyword}. Subject Stability: Extreme.`,
-      `Style: ${config?.activeStyle || 'cinematic'}, 4k, professional lighting.`,
-      `NEGATIVE: NO hovering, NO melting, NO distortion, NO frozen smiles, NO repetitive idle motions.`
-    ].filter(Boolean).join(' ').slice(0, 1000);
-
+    const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
+    const motionIntensity = Number(config?.motionIntensity ?? 50);
+    const motionKeyword = motionIntensity > 70 ? "Fluid cinematic motion" : "Stable shot, locked geometry";
     const ratio = config?.aspectRatio === '16:9' ? '1280:768' : '768:1280';
     const audioFileName = `fpt_${finalScriptId}.mp3`;
     const audioFilePath = path.join(audioDir, audioFileName);
-    let audioUrl = '';
-
-    // --- SOURCE PRODUCT IMAGE ---
-    const productImage = config?.productImage || configData.savedProductImageUrl;
-
-    // --- PARALLEL EXECUTION: AUDIO & VIDEO ---
-    console.log('[PIPELINE] Starting Parallel Generation...');
-    
-    const [audioResultUrl, rawVideoUrl] = await Promise.all([
-      generateAudioTask(totalAudioScript, config, finalScriptId, audioDir, audioFilePath, fptApiKey || undefined),
-      generateVideoTask(runway, visualPrompt, ratio, duration, productImage)
-    ]);
-
-    audioUrl = audioResultUrl;
-
-      // --- FFmpeg MASHUP (EMBED AUDIO INTO VIDEO) ---
-      let finalVideoUrl = rawVideoUrl;
-      const finalVideoName = `final_${finalScriptId}.mp4`;
-      const finalVideoPath = path.join(videoDir, finalVideoName);
-      const tempVideoPath = path.join(process.cwd(), 'public', 'videos', `temp_${finalScriptId}.mp4`);
-
-      // Kiểm tra xem audio có tồn tại không trước khi lồng
-      if (fs.existsSync(audioFilePath)) {
-        try {
-          console.log(`[FFMPEG] Merging audio and video...`);
-          // 1. Download raw video from Runway
-          const vResp = await fetch(rawVideoUrl);
-          const vBuffer = Buffer.from(await vResp.arrayBuffer());
-          fs.writeFileSync(tempVideoPath, vBuffer);
-
-          // 2. Run FFmpeg command
-          const { execSync } = require('child_process');
-          const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
-          
-          execSync(`"${ffmpegPath}" -y -i "${tempVideoPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -shortest "${finalVideoPath}"`);
-          
-          finalVideoUrl = `/videos/${finalVideoName}`;
-          console.log(`[FFMPEG] SUCCESS. Output: ${finalVideoUrl}`);
-          
-          // Cleanup temp file
-          if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
-        } catch (ffErr) {
-          console.error('[FFMPEG-ERROR] Merge failed, falling back to raw video:', ffErr);
-          finalVideoUrl = rawVideoUrl; // Fallback
+    // --- RESOLVE PRODUCT IMAGE ---
+    let finalProductImage = config?.productImage || configData.savedProductImageUrl;
+    if (finalProductImage && finalProductImage.startsWith('/')) {
+      try {
+        const fullImagePath = path.join(process.cwd(), 'public', finalProductImage);
+        if (fs.existsSync(fullImagePath)) {
+          console.log(`[PIPELINE] Reading local product image: ${fullImagePath}`);
+          const imageBuffer = fs.readFileSync(fullImagePath);
+          const ext = path.extname(fullImagePath).slice(1) || 'png';
+          finalProductImage = `data:image/${ext};base64,${imageBuffer.toString('base64')}`;
         }
-      } else {
-        console.warn('[FFMPEG-SKIP] Audio file not found. Skipping merge, using raw video.');
-        finalVideoUrl = rawVideoUrl;
+      } catch (imgErr) {
+        console.error('[PIPELINE-IMAGE-ERROR] Failed to read local image:', imgErr);
       }
+    }
+    const productImage = finalProductImage;
 
-      const dbScene = await prisma.videoScene.create({
-        data: { 
-          generationId, 
-          sceneOrder: 1, 
-          visualPrompt, 
-          audioScript: totalAudioScript, 
-          videoClipUrl: finalVideoUrl, 
-          audioUrl,
-          metadata: JSON.stringify({}) // Stringify for SQLite
-        },
-      });
-      await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'completed' } });
-      return NextResponse.json({ success: true, results: [dbScene] });
+    // --- PIPELINE: GENERATE ALL CLIPS ---
+    console.log(`[PIPELINE] Multi-clip Generation: ${numClips} clips for ${totalSeconds}s total using ${selectedModel.toUpperCase()}.`);
+    
+    // Gen Audio in parallel with video batch
+    const audioPromise = config?.voiceOver !== false
+        ? generateAudioTask(totalAudioScript, config, finalScriptId, audioDir, audioFilePath, fptApiKey || undefined)
+        : Promise.resolve('');
+
+    const videoTasks = clipsConfig.map(async (c, i) => {
+        // Phân bổ scenes cho clip này (nguyên tắc chia đều % thời gian)
+        const startIdx = Math.floor((i / numClips) * scenes.length);
+        const endIdx = Math.floor(((i + 1) / numClips) * scenes.length);
+        const clipScenes = scenes.slice(startIdx, Math.max(endIdx, startIdx + 1));
+        
+        const combinedDesc = clipScenes.map(s => `${s.visualDescription} ${s.technicalKeywords}`).join(' ');
+        
+        // Context Injection để giữ tính nhất quán
+        const consistencyContext = i > 0 
+            ? `CONTINUITY: This is segment ${i+1} of a long sequence. Maintain exact same ${mainCharacter} appearance, clothing, and the ${locationContext} background from the previous clip. No jumping locations.` 
+            : "START SCENE: High fidelity macro focus on food, then reveal character.";
+
+        const visualPrompt = [
+            `A ${c.duration}s cinematic 4k food marketing video.`,
+            `Action: ${combinedDesc}`,
+            consistencyContext,
+            `Character: ${genderInEng} ${mainCharacter}, introducing product with active visible speech and natural expressions.`,
+            `Product: High adherence to source image, 100% rigid geometry, no morphing.`,
+            `Style: ${config?.activeStyle || 'cinematic'}, professional lighting. ${motionKeyword}`,
+        ].join(' ').slice(0, 1000);
+
+        if (selectedModel === 'kling') {
+            return generateKlingVideoTask(generateKlingToken(klingAccessKey!, klingSecretKey!), visualPrompt, ratio, c.duration, productImage);
+        } else if (selectedModel === 'veo') {
+            return generateVeoVideoTask(googleApiKey!, visualPrompt, ratio, c.duration, productImage);
+        } else {
+            return generateVideoTask(runway, visualPrompt, ratio, c.duration, productImage);
+        }
+    });
+
+    try {
+        const [audioResultUrl, ...rawVideoUrls] = await Promise.all([audioPromise, ...videoTasks]);
+        const audioUrl = audioResultUrl;
+
+        // --- FFmpeg STITCHING ---
+        let finalVideoUrl = rawVideoUrls[0];
+        const finalVideoName = `final_${finalScriptId}.mp4`;
+        const finalVideoPath = path.join(videoDir, finalVideoName);
+        
+        console.log(`[FFMPEG] Stitching ${rawVideoUrls.length} clips into one long video...`);
+        const { execSync } = require('child_process');
+        const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
+        
+        // Tạo file list.txt cho concat
+        const listPath = path.join(videoDir, `list_${finalScriptId}.txt`);
+        let listContent = "";
+        
+        for (let i = 0; i < rawVideoUrls.length; i++) {
+            const tmpPath = path.join(videoDir, `part_${i}_${finalScriptId}.mp4`);
+            const vResp = await fetch(rawVideoUrls[i]);
+            const vBuffer = Buffer.from(await vResp.arrayBuffer());
+            fs.writeFileSync(tmpPath, vBuffer);
+            listContent += `file 'part_${i}_${finalScriptId}.mp4'\n`;
+        }
+        fs.writeFileSync(listPath, listContent);
+
+        // Nối video và lồng audio
+        // Dùng libx264 để đảm bảo tính tương thích cao nhất sau khi nối
+        const mergeCmd = fs.existsSync(audioFilePath)
+            ? `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v -map "[aout]" -c:v libx264 -pix_fmt yuv420p -shortest "${finalVideoPath}"`
+            : `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v libx264 -pix_fmt yuv420p "${finalVideoPath}"`;
+            
+        execSync(mergeCmd, { cwd: videoDir });
+        finalVideoUrl = `/videos/${finalVideoName}`;
+        console.log(`[FFMPEG] STITCH SUCCESS: ${finalVideoUrl}`);
+
+        // Cleanup
+        rawVideoUrls.forEach((_, i) => {
+            const p = path.join(videoDir, `part_${i}_${finalScriptId}.mp4`);
+            if (fs.existsSync(p)) fs.unlinkSync(p);
+        });
+        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+
+        const dbScene = await prisma.videoScene.create({
+          data: { 
+            generationId, 
+            sceneOrder: 1, 
+            visualPrompt: `Multi-clip Stitched (${numClips} clips)`, 
+            audioScript: totalAudioScript, 
+            videoClipUrl: finalVideoUrl, 
+            audioUrl,
+            metadata: JSON.stringify({ clips: rawVideoUrls })
+          },
+        });
+        await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'completed' } });
+        return NextResponse.json({ success: true, results: [dbScene] });
+
+    } catch (pipelineErr: any) {
+        console.error('[PIPELINE-ERROR]', pipelineErr);
+        await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'failed' } });
+        throw pipelineErr;
+    }
   } catch (error: any) {
     console.error('[API-CRITICAL]', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
