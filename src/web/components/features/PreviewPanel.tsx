@@ -15,6 +15,7 @@ interface PreviewPanelProps {
     resolution: string;
     aspectRatio: string;
     duration: string;
+    model: string;
     voiceGender: string;
     activeStyle: string;
     activeTone: string;
@@ -30,6 +31,15 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
   // Find the label for the active style
   const styleLabel = VISUAL_STYLES.find(s => s.id === config.activeStyle)?.label || config.activeStyle;
   const voiceLabel = VOICES.find(v => v.id === config.voiceGender)?.label || config.voiceGender;
+
+  const getModelName = (modelId: string) => {
+    switch (modelId) {
+      case 'runway': return 'Runway Gen-3';
+      case 'kling': return 'Kling AI 3.0';
+      case 'veo': return 'Veo 3.1 Fast';
+      default: return modelId;
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -176,7 +186,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
           <div className="summary-list" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Model</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>Veo 3.1 Fast</span>
+              <span style={{ fontWeight: 600, color: '#d97706' }}>{getModelName(config.model)}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Resolution</span>

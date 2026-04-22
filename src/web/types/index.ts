@@ -1,6 +1,7 @@
+export type AIModelType = 'runway' | 'kling' | 'veo';
 export type ResolutionType = '720p' | '1080p' | '4k';
 export type AspectRatioType = '16:9' | '9:16' | '1:1';
-export type DurationType = '5s' | '10s' | '15s' | '30s' | '60s';
+export type DurationType = '5s' | '10s' | '15s' | '30s' | '60s' | '3m' | '5m';
 
 export interface VideoConfigState {
   resolution: ResolutionType;

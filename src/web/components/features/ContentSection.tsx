@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { TONES, CHARACTERS } from '../../constants';
-import { Search, ChevronDown, User, PlusCircle } from 'lucide-react';
+import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText } from 'lucide-react';
 
 interface ContentSectionProps {
   foodTopic: string;
@@ -25,7 +25,20 @@ interface ContentSectionProps {
   setVideoGenre: (v: string) => void;
   loading: boolean;
   setVoiceGender: (v: string) => void;
+  isMarketingMode: boolean;
+  setIsMarketingMode: (v: boolean) => void;
+  referenceDoc: string;
+  setReferenceDoc: (v: string) => void;
+  videoScenes?: any[];
 }
+
+const PRESET_LOCATIONS = [
+  'Tại cửa hàng',
+  'Trung tâm thương mại',
+  'Nhà bếp hiện đại', 
+  'Quầy thực phẩm',
+  'Ngoài trời / Đường phố'
+];
 
 export const ContentSection = ({
   foodTopic, setFoodTopic,
@@ -41,37 +54,119 @@ export const ContentSection = ({
   videoGenre,
   setVideoGenre,
   loading,
-  setVoiceGender
+  setVoiceGender,
+  isMarketingMode,
+  setIsMarketingMode,
+  referenceDoc,
+  setReferenceDoc,
+  videoScenes = []
 }: ContentSectionProps) => {
+  const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
+  const [selectedLocOption, setSelectedLocOption] = useState(isCustomLoc ? 'custom' : (locationContext || PRESET_LOCATIONS[0]));
+
+  useEffect(() => {
+    if (locationContext === '' && selectedLocOption === 'custom') return;
+    const isCustom = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
+    setSelectedLocOption(isCustom ? 'custom' : (locationContext || PRESET_LOCATIONS[0]));
+  }, [locationContext]);
+
   const handleCharacterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const charId = e.target.value;
     const char = CHARACTERS.find(c => c.id === charId);
     if (char) {
       setCharacterId(char.id);
-      // Nếu là nhân vật tùy chỉnh, giữ nguyên giới tính hiện tại để người dùng tự chọn tiếp
       if (char.id !== 'custom_character') {
         setCharacterType(char.gender);
         setVoiceGender(char.gender === 'Nam' ? 'leminh' : 'banmai');
         setMainCharacter(char.defaultDescription);
       } else {
-        // Clear mô tả khi chuyển sang tùy chỉnh để người dùng nhập mới
         setMainCharacter('');
       }
     }
   };
 
+  const handleLocationOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedLocOption(val);
+    if (val !== 'custom') {
+      setLocationContext(val);
+    } else {
+      setLocationContext('');
+    }
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
-      <div className="section-title">
-        <span className="section-title-dot" />
-        Nội dung kịch bản
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="section-title" style={{ marginBottom: 0 }}>
+          <span className="section-title-dot" />
+          Nội dung kịch bản
+        </div>
+        
+        {/* Marketing Mode Toggle */}
+        <div 
+          onClick={() => setIsMarketingMode(!isMarketingMode)}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            background: isMarketingMode ? 'rgba(245, 158, 11, 0.1)' : '#f1f5f9',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            border: `1px solid ${isMarketingMode ? 'var(--amber-200)' : '#e2e8f0'}`,
+            userSelect: 'none'
+          }}
+        >
+          <span style={{ fontSize: '12px', fontWeight: 600, color: isMarketingMode ? 'var(--amber-700)' : '#475569' }}>
+            {isMarketingMode ? 'Chế độ Marketing' : 'Chế độ Sáng tạo'}
+          </span>
+          <div style={{
+            width: '28px',
+            height: '16px',
+            background: isMarketingMode ? 'var(--amber-500)' : '#cbd5e1',
+            borderRadius: '10px',
+            position: 'relative',
+            marginLeft: '4px'
+          }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              background: 'white',
+              borderRadius: '50%',
+              position: 'absolute',
+              top: '2px',
+              left: isMarketingMode ? '14px' : '2px',
+              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            }} />
+          </div>
+        </div>
       </div>
       
       <div className="section-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-        {/* 1. Chủ đề món ăn */}
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Chủ đề món ăn</label>
-          <input className="form-input" placeholder="VD: Tô phở bò nóng hổi..." value={foodTopic} onChange={e => setFoodTopic(e.target.value)} />
+        {/* 1. Chủ đề / Tài liệu tham khảo */}
+        <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
+          <label className="form-label">
+            {isMarketingMode ? 'Tài liệu & Thông tin sản phẩm' : 'Chủ đề món ăn'}
+          </label>
+          
+          {isMarketingMode ? (
+            <textarea 
+              className="form-textarea" 
+              placeholder="Dán nội dung bài viết, tài liệu sản phẩm hoặc mô tả chiến dịch Marketing tại đây..." 
+              style={{ minHeight: 100 }} 
+              value={referenceDoc} 
+              onChange={e => setReferenceDoc(e.target.value)} 
+            />
+          ) : (
+            <input 
+              className="form-input" 
+              placeholder="VD: Tô phở bò nóng hổi..." 
+              value={foodTopic} 
+              onChange={e => setFoodTopic(e.target.value)} 
+            />
+          )}
         </div>
 
         {/* 2. Cấu hình Nhân vật & Bối cảnh */}
@@ -92,17 +187,32 @@ export const ContentSection = ({
             <label className="form-label">Bối cảnh</label>
             <select 
               className="form-select" 
-              value={locationContext} 
-              onChange={e => setLocationContext(e.target.value)}
+              value={selectedLocOption}
+              onChange={handleLocationOptionChange}
             >
-              <option>Tại cửa hàng</option>
-              <option>Trung tâm thương mại</option>
-              <option>Nhà bếp hiện đại</option>
-              <option>Quầy thực phẩm</option>
-              <option>Ngoài trời / Đường phố</option>
+              {PRESET_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+              <option value="custom">Khác...</option>
             </select>
           </div>
         </div>
+
+        {/* Custom Location Input */}
+        {selectedLocOption === 'custom' && (
+          <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
+             <label className="form-label">Nhập bối cảnh riêng</label>
+             <div style={{ position: 'relative' }}>
+               <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--amber-500)' }} />
+               <input 
+                 className="form-input" 
+                 placeholder="VD: Trong một khu rừng nhiệt đới, Trên mặt trăng..." 
+                 style={{ paddingLeft: '36px' }}
+                 value={locationContext} 
+                 onChange={e => setLocationContext(e.target.value)}
+                 autoFocus
+               />
+             </div>
+          </div>
+        )}
 
         {/* 2.1 Lựa chọn giới tính cho nhân vật tùy chỉnh */}
         {characterId === 'custom_character' && (
@@ -167,14 +277,21 @@ export const ContentSection = ({
             <label className="form-label">Số cảnh</label>
             <select 
               className="form-select" 
-              value={numScenes} 
+              value={isMarketingMode ? 'Gợi ý 7 cảnh' : numScenes} 
               onChange={e => setNumScenes(e.target.value)}
+              disabled={isMarketingMode}
             >
-              <option>1 cảnh</option>
-              <option>2 cảnh</option>
-              <option>3 cảnh</option>
-              <option>5 cảnh</option>
-              <option>7 cảnh</option>
+              {isMarketingMode ? (
+                <option>Tự động (7 cảnh)</option>
+              ) : (
+                <>
+                  <option>1 cảnh</option>
+                  <option>2 cảnh</option>
+                  <option>3 cảnh</option>
+                  <option>5 cảnh</option>
+                  <option>7 cảnh</option>
+                </>
+              )}
             </select>
           </div>
         </div>

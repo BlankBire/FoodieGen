@@ -20,6 +20,8 @@ interface VisualAudioSectionProps {
   setLanguage: (v: string) => void;
   voiceSpeed: number;
   setVoiceSpeed: (v: number) => void;
+  voiceOver: boolean;
+  setVoiceOver: (v: boolean) => void;
   bgMusic: boolean;
   setBgMusic: (v: boolean) => void;
 }
@@ -33,6 +35,7 @@ export const VisualAudioSection = ({
   voiceGender, setVoiceGender,
   language, setLanguage,
   voiceSpeed, setVoiceSpeed,
+  voiceOver, setVoiceOver,
   bgMusic, setBgMusic
 }: VisualAudioSectionProps) => (
   <div className="config-grid" style={{ marginTop: 'var(--space-2)' }}>
@@ -106,8 +109,9 @@ export const VisualAudioSection = ({
           />
         </div>
 
-        <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-4)', marginTop: 'auto', display: 'flex', alignItems: 'center', minHeight: '42px' }}>
-          <Toggle checked={bgMusic} onChange={setBgMusic} label="Nhạc nền" />
+        <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-4)', marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '42px' }}>
+          <Toggle checked={voiceOver} onChange={setVoiceOver} label="Thuyết minh" />
+          <Toggle checked={bgMusic} onChange={setBgMusic} label="Nhạc nền" direction="column" align="flex-end" />
         </div>
       </div>
     </div>

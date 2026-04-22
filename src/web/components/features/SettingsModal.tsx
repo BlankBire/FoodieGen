@@ -10,27 +10,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [googleKey, setGoogleKey] = useState('');
   const [runwayKey, setRunwayKey] = useState('');
   const [fptKey, setFptKey] = useState('');
+  const [klingAccessKey, setKlingAccessKey] = useState('');
+  const [klingSecretKey, setKlingSecretKey] = useState('');
   
   const [showGoogle, setShowGoogle] = useState(false);
   const [showRunway, setShowRunway] = useState(false);
   const [showFpt, setShowFpt] = useState(false);
+  const [showKlingAccess, setShowKlingAccess] = useState(false);
+  const [showKlingSecret, setShowKlingSecret] = useState(false);
   
   const [isSaved, setIsSaved] = useState(false);
 
   // Load keys from localStorage on mount
   useEffect(() => {
     if (isOpen) {
-      setGoogleKey(localStorage.getItem('foodiegen_google_key') || '');
-      setRunwayKey(localStorage.getItem('foodiegen_runway_key') || '');
-      setFptKey(localStorage.getItem('foodiegen_fpt_key') || '');
+      setGoogleKey(localStorage.getItem('foodiegen_google_api_key') || '');
+      setRunwayKey(localStorage.getItem('foodiegen_runway_api_key') || '');
+      setFptKey(localStorage.getItem('foodiegen_fpt_api_key') || '');
+      setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
+      setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
       setIsSaved(false);
     }
   }, [isOpen]);
 
   const handleSave = () => {
-    localStorage.setItem('foodiegen_google_key', googleKey);
-    localStorage.setItem('foodiegen_runway_key', runwayKey);
-    localStorage.setItem('foodiegen_fpt_key', fptKey);
+    localStorage.setItem('foodiegen_google_api_key', googleKey);
+    localStorage.setItem('foodiegen_runway_api_key', runwayKey);
+    localStorage.setItem('foodiegen_fpt_api_key', fptKey);
+    localStorage.setItem('foodiegen_kling_access_key', klingAccessKey);
+    localStorage.setItem('foodiegen_kling_secret_key', klingSecretKey);
     
     setIsSaved(true);
     setTimeout(() => {
@@ -181,6 +189,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
               >
                 {showFpt ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Kling AI Access Key */}
+          <div className="input-group">
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
+              Kling AI Access Key
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                type={showKlingAccess ? "text" : "password"}
+                value={klingAccessKey}
+                onChange={e => setKlingAccessKey(e.target.value)}
+                placeholder="Nhập Access Key từ Kling AI..."
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  paddingRight: '44px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  outline: 'none',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button 
+                onClick={() => setShowKlingAccess(!showKlingAccess)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                {showKlingAccess ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Kling AI Secret Key */}
+          <div className="input-group">
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
+              Kling AI Secret Key
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                type={showKlingSecret ? "text" : "password"}
+                value={klingSecretKey}
+                onChange={e => setKlingSecretKey(e.target.value)}
+                placeholder="Nhập Secret Key từ Kling AI..."
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  paddingRight: '44px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  outline: 'none',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button 
+                onClick={() => setShowKlingSecret(!showKlingSecret)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                {showKlingSecret ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>

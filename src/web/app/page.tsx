@@ -1,62 +1,30 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { AlertCircle } from 'lucide-react'
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'
-
-/** Convert Google file URL to proxy URL (adds API key server-side) */
-function toProxyUrl(raw: string): string {
-  if (!raw?.startsWith('https://generativelanguage.googleapis.com/')) return raw
-  const base64 = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  return `${API_BASE}/api/video/proxy?u=${encodeURIComponent(base64)}`
-}
-
-/** Prepend API_BASE for relative audio/video paths (formerly handled by rewrites) */
-function toAssetUrl(url: string): string {
-  if (!url) return url
-  if (url.startsWith('/audio') || url.startsWith('/videos')) {
-    return `${API_BASE}${url}`
-  }
-  return url
-}
-
-/** Robust fetch with retries for production backend startup */
-async function fetchWithRetry(url: string, options: any, retries = 3, delay = 2000): Promise<Response> {
-  try {
-    const res = await fetch(url, options)
-    // If we get a 503 or 429, we might want to retry even if fetch didn't "fail" in the network sense
-    if ((res.status === 503 || res.status === 429) && retries > 0) {
-      console.warn(`Server returned ${res.status}. Retrying in ${delay}ms...`)
-      await new Promise(r => setTimeout(r, delay))
-      return fetchWithRetry(url, options, retries - 1, delay)
-    }
-    return res
-  } catch (err) {
-    if (retries > 0) {
-      console.warn(`Fetch network error. Retrying in ${delay}ms... (${retries} left)`)
-      await new Promise(r => setTimeout(r, delay))
-      return fetchWithRetry(url, options, retries - 1, delay)
-    }
-    throw err
-  }
-}
-import { TONES, CHARACTERS, VOICES } from '../constants'
-import { ResolutionType, AspectRatioType, DurationType } from '../types'
-
-// Components
+import React, { useState, useEffect } from 'react'
 import { AppHeader } from '../components/features/AppHeader'
-import { ContentSection } from '../components/features/ContentSection'
 import { VideoConfigSection } from '../components/features/VideoConfigSection'
+import { ContentSection } from '../components/features/ContentSection'
 import { VisualAudioSection } from '../components/features/VisualAudioSection'
 import { PreviewPanel } from '../components/features/PreviewPanel'
 import { SettingsModal } from '../components/features/SettingsModal'
+import { ResolutionType, AspectRatioType, DurationType, AIModelType } from '../types'
+import { TONES, CHARACTERS } from '../constants'
+import { AlertCircle } from 'lucide-react'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+function toAssetUrl(relative: string) {
+  if (!relative) return ''
+  if (relative.startsWith('http')) return relative
+  return `${API_BASE}${relative}`
+}
 
 export default function Home() {
   // State: Video Config
   const [resolution,     setResolution]     = useState<ResolutionType>('720p')
   const [aspectRatio,    setAspectRatio]    = useState<AspectRatioType>('9:16')
   const [duration,       setDuration]       = useState<DurationType>('5s')
+  const [model,          setModel]          = useState<AIModelType>('runway')
   const [activeStyle,    setActiveStyle]    = useState('cinematic')
   const [activeTone,     setActiveTone]     = useState(TONES[0])
   const [emotion,        setEmotion]        = useState('Vui tươi')
@@ -68,6 +36,7 @@ export default function Home() {
   const [voiceGender,    setVoiceGender]    = useState('leminh')
   const [language,       setLanguage]       = useState('vi')
   const [voiceSpeed,     setVoiceSpeed]     = useState(50)
+  const [voiceOver,      setVoiceOver]      = useState(true)
   const [bgMusic,        setBgMusic]        = useState(false)
 
   // State: Content
@@ -77,13 +46,16 @@ export default function Home() {
   const [locationContext,setLocationContext]= useState('Tại cửa hàng')
   const [mainCharacter,  setMainCharacter]  = useState('Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.')
   const [videoGenre,     setVideoGenre]     = useState('Giới thiệu món ăn')
-  const [script,         setScript]         = useState('')
+  const [numScenes,      setNumScenes]      = useState('2 cảnh')
+  const [isMarketingMode, setIsMarketingMode] = useState(false)
+  const [referenceDoc,   setReferenceDoc]   = useState('')
   const [scriptId,       setScriptId]       = useState('')
   const [projectId,      setProjectId]      = useState('123e4567-e89b-12d3-a456-426614174000')
-  const [numScenes,      setNumScenes]      = useState('2 cảnh')
+  const [script,         setScript]         = useState('')
   const [videoUrl,       setVideoUrl]       = useState('')
   const [audioUrl,       setAudioUrl]       = useState('')
   const [videoScenes,    setVideoScenes]    = useState<any[]>([])
+  const [rawScenes,      setRawScenes]      = useState<any[]>([])
   const [productImage,   setProductImage]   = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
@@ -91,6 +63,7 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; hiding: boolean } | null>(null)
   const [isReadingMode, setIsReadingMode] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isReadingMode) setIsReadingMode(false)
@@ -99,7 +72,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isReadingMode])
 
-  // Restore Draft from LocalStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('foodiegen_draft')
     if (saved) {
@@ -108,6 +80,7 @@ export default function Home() {
         if (d.resolution) setResolution(d.resolution)
         if (d.aspectRatio) setAspectRatio(d.aspectRatio)
         if (d.duration) setDuration(d.duration)
+        if (d.model) setModel(d.model)
         if (d.activeStyle) setActiveStyle(d.activeStyle)
         if (d.activeTone) setActiveTone(d.activeTone)
         if (d.emotion) setEmotion(d.emotion)
@@ -117,6 +90,7 @@ export default function Home() {
         if (d.voiceGender) setVoiceGender(d.voiceGender)
         if (d.language) setLanguage(d.language)
         if (d.voiceSpeed) setVoiceSpeed(d.voiceSpeed)
+        if (d.voiceOver !== undefined) setVoiceOver(d.voiceOver)
         if (d.bgMusic !== undefined) setBgMusic(d.bgMusic)
         if (d.foodTopic) setFoodTopic(d.foodTopic)
         if (d.characterType) setCharacterType(d.characterType)
@@ -126,15 +100,7 @@ export default function Home() {
         if (d.script) setScript(d.script)
         if (d.videoScenes) setVideoScenes(d.videoScenes)
         if (d.productImage) setProductImage(d.productImage)
-        if (d.videoUrl) setVideoUrl(d.videoUrl)
-        if (d.audioUrl) setAudioUrl(d.audioUrl)
-        if (d.scriptId) setScriptId(d.scriptId)
-        if (d.projectId) setProjectId(d.projectId)
-        if (d.numScenes) setNumScenes(d.numScenes)
-        console.log('[DRAFT] Restored from LocalStorage (Topic:', d.foodTopic, ')')
-      } catch (e) {
-        console.error('Failed to parse draft', e)
-      }
+      } catch (e) {}
     }
   }, [])
 
@@ -143,7 +109,7 @@ export default function Home() {
     setTimeout(() => {
       setToast(prev => prev ? { ...prev, hiding: true } : null)
       setTimeout(() => setToast(null), 500)
-    }, 4000)
+    }, 3000)
   }
 
   const handleReset = () => {
@@ -151,6 +117,7 @@ export default function Home() {
     setResolution('720p')
     setAspectRatio('9:16')
     setDuration('5s')
+    setModel('runway')
     setActiveStyle('cinematic')
     setActiveTone(TONES[0])
     setEmotion('Vui tươi')
@@ -162,6 +129,7 @@ export default function Home() {
     setVoiceGender('Nam')
     setLanguage('vi')
     setVoiceSpeed(50)
+    setVoiceOver(true)
     setBgMusic(false)
 
     // Reset Content
@@ -171,56 +139,59 @@ export default function Home() {
     setCharacterType(defaultChar.gender)
     // Default to Le Minh for Male chef
     setVoiceGender('leminh')
+    
+    setFoodTopic('')
     setVideoGenre('Giới thiệu món ăn')
-    setLocationContext('Tại cửa hàng')
     setScript('')
-    setScriptId('')
-    setProjectId('')
-    setNumScenes('2 cảnh')
     setVideoUrl('')
     setAudioUrl('')
     setVideoScenes([])
     setProductImage(null)
-    setIsReadingMode(false)
     setStatus('')
-    localStorage.removeItem('foodiegen_draft')
     
-    alert('Đã làm mới toàn bộ tùy chọn về mặc định!')
+    localStorage.removeItem('foodiegen_draft')
+    setIsMarketingMode(false)
+    setReferenceDoc('')
+    showToast('Đã làm mới toàn bộ cài đặt.')
   }
 
-  const handleDownload = () => {
-    if (!videoUrl) {
-      alert('Vui lòng tạo video trước khi tải xuống!')
-      return
+  const handleDownload = async () => {
+    if (!videoUrl) return showToast('Chưa có video để tải.')
+    try {
+      showToast('Đang chuẩn bị tải xuống...')
+      const res = await fetch(videoUrl)
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `foodiegen_video_${Date.now()}.mp4`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('Download failed:', err)
+      showToast('Tải xuống thất bại. Vui lòng thử lại.')
     }
-    
-    // Microsoft-style "Save As" experience
-    const link = document.createElement('a')
-    link.href = toAssetUrl(videoUrl)
-    link.setAttribute('download', `FoodieGen_Video_${Date.now()}.mp4`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    
-    showToast('Bắt đầu tải xuống video...')
   }
 
   const handleSaveDraft = async () => {
     try {
       setLoading(true)
       setStatus('Đang lưu bản nháp...')
-
+      
       const payload = {
-        projectId,
-        scriptId,
-        topic: foodTopic,
-        scenes: [], // Nếu có parser kịch bản thì đưa vào đây
-        config: {
-          resolution, aspectRatio, duration, activeStyle, activeTone,
-          emotion, motionIntensity, transitions, charConsistency,
-          voiceGender, language, voiceSpeed, bgMusic,
-          characterId, characterType, locationContext, mainCharacter, numScenes, 
-          script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
+        name: foodTopic || 'Kịch bản chưa đặt tên',
+        projectId: projectId,
+        content: {
+          scenes: [], // Nếu có parser kịch bản thì đưa vào đây
+          config: {
+            resolution, aspectRatio, duration, model, activeStyle, activeTone,
+            emotion, motionIntensity, transitions, charConsistency,
+            voiceGender, language, voiceSpeed, voiceOver, bgMusic,
+            characterId, characterType, locationContext, mainCharacter, numScenes, 
+            script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
+          }
         }
       }
 
@@ -230,127 +201,124 @@ export default function Home() {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
-
-      if (data.projectId) setProjectId(data.projectId)
-      if (data.scriptId) setScriptId(data.scriptId)
-
-      // Lưu vào LocalStorage để khôi phục khi F5 (giống draw.io)
-      const draftData = { ...payload.config, projectId: data.projectId || projectId, scriptId: data.scriptId || scriptId }
-      localStorage.setItem('foodiegen_draft', JSON.stringify(draftData))
-
-      alert('ĐÃ LƯU BẢN NHÁP THÀNH CÔNG!\nBạn có thể quay lại chỉnh sửa bất cứ lúc nào.')
-      setStatus('Đã lưu bản nháp.')
+      
+      if (data.success) {
+        setScriptId(data.id)
+        localStorage.setItem('foodiegen_draft', JSON.stringify({
+          resolution, aspectRatio, duration, model, activeStyle, activeTone,
+          emotion, motionIntensity, transitions, charConsistency,
+          voiceGender, language, voiceSpeed, voiceOver, bgMusic,
+          foodTopic, characterType, locationContext, mainCharacter, videoGenre,
+          script, videoScenes, productImage
+        }))
+        showToast('Đã lưu kịch bản vào bộ nhớ tạm thời.')
+        setStatus('Đã lưu nháp.')
+      } else {
+        throw new Error(data.error || 'Lưu thất bại')
+      }
     } catch (err: any) {
       console.error(err)
-      alert('Không thể lưu bản nháp. Vui lòng kiểm tra lại kết nối hoặc hệ thống database.')
-      setStatus('Lỗi lưu nháp.')
+      alert('Lỗi khi lưu bản nháp: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleGenerateScript = async () => {
+    if (!foodTopic.trim()) return alert('Vui lòng nhập món ăn/chủ đề.')
+    
     try {
-      if (!foodTopic) {
-        alert('Vui lòng nhập chủ đề món ăn.')
-        return
-      }
       setLoading(true)
-      setStatus('Đang phác thảo kịch bản...')
-
-      const userId = '123e4567-e89b-12d3-a456-426614174000' 
-
-      const resContent = await fetchWithRetry(`${API_BASE}/api/generate/content`, {
+      setStatus('AI đang sáng tạo kịch bản...')
+      
+      const res = await fetch(`${API_BASE}/api/generate/content`, { 
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-runway-api-key': localStorage.getItem('foodiegen_runway_key') || '',
-          'x-google-api-key': localStorage.getItem('foodiegen_google_key') || '',
-          'x-fpt-api-key': localStorage.getItem('foodiegen_fpt_key') || '',
+          'x-google-api-key': localStorage.getItem('foodiegen_google_api_key') || ''
         },
-        body: JSON.stringify({ 
-          topic: foodTopic, 
-          tone: activeTone, 
-          projectId: userId,
+        body: JSON.stringify({
+          topic: isMarketingMode ? referenceDoc : foodTopic,
+          isMarketingMode,
+          referenceDoc: isMarketingMode ? referenceDoc : '',
+          tone: activeTone,
+          projectId: projectId,
           characterId,
           characterType,
           mainCharacter,
           locationContext,
           videoGenre,
           numScenes,
-          duration,
-          productImage 
+          productImage
         }),
       })
-      const dataContent = await resContent.json()
-      if (dataContent.error) throw new Error(dataContent.error)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      
+      if (data.fullAudioScript || data.scenes) {
+        // Compose format hiển thị từ dữ liệu có sẵn
+        let displayParts: string[] = []
 
-      setScriptId(dataContent.scriptId)
-      if (dataContent.projectId) setProjectId(dataContent.projectId)
-      
-      if (dataContent.warning) {
-        showToast(dataContent.warning)
+        if (data.fullAudioScript) {
+          displayParts.push(`[LỜI THOẠI TOÀN BỘ VIDEO]\n${data.fullAudioScript}`)
+        }
+
+        if (data.scenes && data.scenes.length > 0) {
+          displayParts.push(`[CHI TIẾT PHÂN CẢNH]`)
+          for (const scene of data.scenes) {
+            displayParts.push(
+              `CẢNH ${scene.sceneOrder}: ${scene.title}\n- Hình ảnh: ${scene.visualDescription}`
+            )
+          }
+        }
+
+        setScript(displayParts.join('\n\n'))
+        if (data.scenes) setRawScenes(data.scenes)
+        if (data.scriptId) setScriptId(data.scriptId)
+        setStatus('Kịch bản đã sẵn sàng. Hãy nhấn "Tạo video" để bắt đầu dựng phim!')
       }
-      
-      // Format script for human reading
-      const scenesText = dataContent.scenes.map((s: any) => 
-        `CẢNH ${s.sceneOrder || '?'}: ${s.title}\n- Hình ảnh: ${s.visualDescription}`
-      ).join('\n\n')
-      
-      const fullAudio = dataContent.fullAudioScript || (dataContent.scenes as any).fullAudioScript || ''
-      const formattedScript = `[LỜI THOẠI TOÀN BỘ VIDEO]\n${fullAudio}\n\n[CHI TIẾT PHÂN CẢNH]\n${scenesText}`
-      
-      setScript(formattedScript)
-      alert('ĐÃ TẠO KỊCH BẢN THÀNH CÔNG!')
-      setStatus('Kịch bản đã sẵn sàng.')
     } catch (err: any) {
       console.error(err)
-      let msg = 'Đã xảy ra lỗi khi kết nối với AI Studio. Vui lòng thử lại sau ít phút.'
-      
-      if (err.message.includes('API Key')) {
-        msg = 'Quá trình tạo kịch bản thất bại. Vui lòng kiểm tra lại Google Gemini API Key trong phần Cài đặt.'
-      } else if (err.message.includes('503') || err.message.toLowerCase().includes('high demand') || err.message.includes('UNAVAILABLE')) {
-        msg = 'Hệ thống AI của Google hiện đang bị quá tải (High Demand). Đây là lỗi từ máy chủ Google Gemini, vui lòng đợi vài giây rồi thử lại nhé!'
-      }
-      
-      alert(msg)
-      console.error("[FETCH-FAILURE]", err);
-      setStatus(`Lỗi: ${err.message || 'Không xác định'}`)
+      alert('Lỗi tạo kịch bản: ' + err.message)
+      setStatus('Lỗi tạo kịch bản.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleGenerateVideo = async () => {
+    if (!script.trim()) return alert('Vui lòng tạo hoặc nhập kịch bản trước.')
+    
     try {
-      if (!script.trim()) {
-        alert('Vui lòng nhập kịch bản hoặc nhấn tạo kịch bản trước.')
-        return
-      }
       setLoading(true)
-      setStatus('Đang gửi lệnh tạo video tới hệ thống AI...')
-
-      const resVideo = await fetchWithRetry(`${API_BASE}/api/generate/video`, {
+      setStatus('Đang khởi tạo Pipeline AI...')
+      
+      // 1. Gửi request generate video (Runway/Kling)
+      const resVideo = await fetch(`${API_BASE}/api/generate/video`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-google-api-key': localStorage.getItem('foodiegen_google_key') || '',
-          'x-runway-api-key': localStorage.getItem('foodiegen_runway_key') || '',
-          'x-fpt-api-key': localStorage.getItem('foodiegen_fpt_key') || '',
+          'x-runway-api-key': localStorage.getItem('foodiegen_runway_api_key') || '',
+          'x-google-api-key': localStorage.getItem('foodiegen_google_api_key') || '',
+          'x-fpt-api-key': localStorage.getItem('foodiegen_fpt_api_key') || '',
+          'x-kling-access-key': localStorage.getItem('foodiegen_kling_access_key') || '',
+          'x-kling-secret-key': localStorage.getItem('foodiegen_kling_secret_key') || '',
         },
         body: JSON.stringify({ 
           scriptId: scriptId,
-          manualScript: script, // Send current textarea content
+          manualScript: script, // Nội dung kịch bản ngôn ngữ tự nhiên
+          scenes: rawScenes,   // DỮ LIỆU PHÂN CẢNH NHÁP (ẨN DƯỚI GIAO DIỆN)
           config: {
             resolution,
             aspectRatio,
             duration,
+            model,
             style: activeStyle,
             motionIntensity,
             emotion,
             voiceGender,
             voiceSpeed,
+            voiceOver,
             bgMusic,
             productImage
           }
@@ -359,30 +327,33 @@ export default function Home() {
       const dataVideo = await resVideo.json()
       if (dataVideo.error) throw new Error(dataVideo.error)
 
-      if (dataVideo.results && dataVideo.results.length > 0) {
-        const processedResults = dataVideo.results.map((r: any) => ({
-          ...r,
-          videoClipUrl: toAssetUrl(r.videoClipUrl),
-          audioUrl: toAssetUrl(r.audioUrl)
-        }))
-        setVideoScenes(processedResults)
-        // Compatibility for old code
-        setVideoUrl(processedResults[0].videoClipUrl)
-        setAudioUrl(processedResults[0].audioUrl)
+      if (dataVideo.success && dataVideo.results?.length > 0) {
+        const finalScene = dataVideo.results[0]
+        const finalVideoUrl = toAssetUrl(finalScene.videoClipUrl)
         
-        alert('ĐÃ TẠO VIDEO THÀNH CÔNG!')
-        setStatus('Hoàn tất tạo video.')
+        setVideoUrl(finalVideoUrl)
+        if (finalScene.audioUrl) setAudioUrl(toAssetUrl(finalScene.audioUrl))
+        
+        // Hiển thị video đã ghép hoàn chỉnh lên Preview
+        setVideoScenes([{
+          videoClipUrl: finalVideoUrl,
+          audioUrl: finalScene.audioUrl ? toAssetUrl(finalScene.audioUrl) : '',
+          sceneOrder: 1
+        }])
+        
+        showToast('HOÀN TẤT! Video đã sẵn sàng trên màn hình Preview.')
+        setStatus('Đồ ăn đã sẵn sàng phục vụ!')
+      } else {
+        const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'Có lỗi xảy ra khi tạo video.'
+        showToast(msg)
+        setStatus(msg)
       }
-
-      const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'HOÀN TẤT! Video đã sẵn sàng.'
-      alert(msg)
-      setStatus(msg)
     } catch (err: any) {
       console.error(err)
       const msg = err.message.includes('API Key')
         ? 'Không thể tạo video. Vui lòng đảm bảo bạn đã nhập đầy đủ API Key (Runway, Google, FPT) trong phần Cài đặt.'
         : 'Quá trình tạo video gặp lỗi (có thể do hệ thống AI quá tải hoặc hết credit). Vui lòng thử lại sau.'
-      alert(msg)
+      showToast(msg)
       setStatus('Lỗi tạo video.')
     } finally {
       setLoading(false)
@@ -401,6 +372,7 @@ export default function Home() {
             resolution={resolution} setResolution={setResolution}
             aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
             duration={duration} setDuration={setDuration}
+            model={model} setModel={setModel}
           />
           
           <ContentSection 
@@ -410,6 +382,7 @@ export default function Home() {
             characterType={characterType} setCharacterType={setCharacterType}
             locationContext={locationContext} setLocationContext={setLocationContext}
             script={script} setScript={setScript}
+            videoScenes={videoScenes}
             activeTone={activeTone} setActiveTone={setActiveTone}
             numScenes={numScenes} setNumScenes={setNumScenes}
             onGenerateScript={handleGenerateScript}
@@ -418,6 +391,10 @@ export default function Home() {
             setVideoGenre={setVideoGenre}
             loading={loading}
             setVoiceGender={setVoiceGender}
+            isMarketingMode={isMarketingMode}
+            setIsMarketingMode={setIsMarketingMode}
+            referenceDoc={referenceDoc}
+            setReferenceDoc={setReferenceDoc}
           />
 
           <VisualAudioSection 
@@ -429,6 +406,7 @@ export default function Home() {
             voiceGender={voiceGender} setVoiceGender={setVoiceGender}
             language={language} setLanguage={setLanguage}
             voiceSpeed={voiceSpeed} setVoiceSpeed={setVoiceSpeed}
+            voiceOver={voiceOver} setVoiceOver={setVoiceOver}
             bgMusic={bgMusic} setBgMusic={setBgMusic}
           />
 
@@ -466,6 +444,7 @@ export default function Home() {
             resolution,
             aspectRatio,
             duration,
+            model,
             voiceGender,
             activeStyle,
             activeTone
