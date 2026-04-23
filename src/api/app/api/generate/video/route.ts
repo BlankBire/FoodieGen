@@ -89,61 +89,101 @@ async function generateAudioTask(
   audioFilePath: string,
   fptApiKeyInput?: string
 ) {
-  if (!totalAudioScript.trim()) return '';
+  if (!totalAudioScript.trim()) {
+    console.warn('[FPT-AI] [SKIP] totalAudioScript is empty, skipping TTS.');
+    return '';
+  }
 
   const fptVoice = config?.voiceGender || 'leminh';
-  console.log(`[FPT-AI] [TASK] Generating TTS with Voice ID: ${fptVoice}...`);
   const fptApiKey = fptApiKeyInput || process.env.FPT_AI_API_KEY;
   const fptSpeed = Math.floor(((config?.voiceSpeed ?? 50) / 100) * 6) - 3;
+  const MAX_API_RETRIES = 3;
   
-  try {
-    const fptRes = await fetch(`https://api.fpt.ai/hmi/tts/v5`, {
-      method: 'POST',
-      headers: { 
-        'api_key': fptApiKey || '',
-        'voice': fptVoice,
-        'speed': String(fptSpeed),
-        'format': 'mp3'
-      },
-      body: totalAudioScript.trim()
-    });
-    
-    const fptData = await fptRes.json();
-    if (fptData.async && fptData.error === 0) {
+  console.log(`[FPT-AI] [TASK] Voice: ${fptVoice} | Speed: ${fptSpeed} | Text length: ${totalAudioScript.trim().length} chars`);
+
+  for (let attempt = 1; attempt <= MAX_API_RETRIES; attempt++) {
+    try {
+      console.log(`[FPT-AI] [ATTEMPT ${attempt}/${MAX_API_RETRIES}] Calling FPT TTS API...`);
+      
+      const fptRes = await fetch(`https://api.fpt.ai/hmi/tts/v5`, {
+        method: 'POST',
+        headers: { 
+          'api_key': fptApiKey || '',
+          'voice': fptVoice,
+          'speed': String(fptSpeed),
+          'format': 'mp3'
+        },
+        body: totalAudioScript.trim()
+      });
+      
+      const fptData = await fptRes.json();
+      console.log(`[FPT-AI] [RESPONSE] Status: ${fptRes.status} | Data:`, JSON.stringify(fptData).substring(0, 500));
+      
+      if (!fptData.async || fptData.error !== 0) {
+        console.error(`[FPT-AI] [API-REJECTED] error: ${fptData.error} | message: ${fptData.message || 'N/A'}`);
+        continue; // Retry with new API call
+      }
+
       const asyncUrl = fptData.async;
+      console.log(`[FPT-AI] [POLLING] Async URL: ${asyncUrl}`);
       let audioBuffer: Buffer | null = null;
       
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000));
+      // Đợi lâu hơn trước poll đầu tiên để FPT có thời gian xử lý
+      await new Promise(r => setTimeout(r, 3000));
+      
+      const maxPolls = 20; // 20 polls × 3s = 60s
+      for (let i = 0; i < maxPolls; i++) {
         try {
           const checkRes = await fetch(asyncUrl);
-          if (checkRes.ok && checkRes.headers.get('content-type')?.includes('audio')) {
+          const contentType = checkRes.headers.get('content-type') || '';
+          
+          if (i % 4 === 0) {
+            console.log(`[FPT-AI] [POLL #${i+1}] Status: ${checkRes.status} | Content-Type: ${contentType}`);
+          }
+          
+          if (checkRes.ok && contentType.includes('audio')) {
             audioBuffer = Buffer.from(await checkRes.arrayBuffer());
+            console.log(`[FPT-AI] [SUCCESS] Audio received: ${audioBuffer.length} bytes after ~${3 + (i+1)*3}s`);
             break;
           }
-        } catch (e) {}
+        } catch (pollErr: any) {
+          console.warn(`[FPT-AI] [POLL #${i+1} ERROR]`, pollErr.message);
+        }
+        await new Promise(r => setTimeout(r, 3000));
       }
       
-      if (audioBuffer) {
-        const rawAudioPath = path.join(audioDir, `raw_fpt_${finalScriptId}.mp3`);
-        fs.writeFileSync(rawAudioPath, audioBuffer);
-        
-        try {
-          const { execSync } = require('child_process');
-          const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
-          execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
-          if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
-          return `/audio/fpt_${finalScriptId}.mp3`;
-        } catch (padErr) {
-          console.error(`[FPT-AI-PAD-ERROR]`, padErr);
-          fs.writeFileSync(audioFilePath, audioBuffer);
-          return `/audio/fpt_${finalScriptId}.mp3`;
-        }
+      if (!audioBuffer) {
+        console.warn(`[FPT-AI] [POLL-TIMEOUT] Attempt ${attempt}: Async URL never resolved. ${attempt < MAX_API_RETRIES ? 'Retrying with new API call...' : 'Giving up.'}`);
+        // Đợi 2s trước khi retry API call mới
+        if (attempt < MAX_API_RETRIES) await new Promise(r => setTimeout(r, 2000));
+        continue; // Retry toàn bộ FPT API call
       }
+      
+      // === THÀNH CÔNG - Lưu file ===
+      const rawAudioPath = path.join(audioDir, `raw_fpt_${finalScriptId}.mp3`);
+      fs.writeFileSync(rawAudioPath, audioBuffer);
+      console.log(`[FPT-AI] [SAVED] Raw audio: ${rawAudioPath}`);
+      
+      try {
+        const { execSync } = require('child_process');
+        const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
+        execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
+        if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
+        console.log(`[FPT-AI] [COMPLETE] Padded audio saved: ${audioFilePath}`);
+        return `/audio/fpt_${finalScriptId}.mp3`;
+      } catch (padErr) {
+        console.error(`[FPT-AI-PAD-ERROR]`, padErr);
+        fs.writeFileSync(audioFilePath, audioBuffer);
+        return `/audio/fpt_${finalScriptId}.mp3`;
+      }
+
+    } catch (err: any) {
+      console.error(`[FPT-AI] [ATTEMPT ${attempt} CRITICAL]`, err.message);
+      if (attempt < MAX_API_RETRIES) await new Promise(r => setTimeout(r, 2000));
     }
-  } catch (err: any) {
-    console.error(`[FPT-AI-TASK-CRITICAL]`, err.message);
   }
+  
+  console.error(`[FPT-AI] [FAILED] All ${MAX_API_RETRIES} attempts exhausted. No audio generated.`);
   return '';
 }
 
@@ -533,10 +573,55 @@ export async function POST(req: Request) {
         }
     });
 
-    try {
-        const [audioResultUrl, ...rawVideoUrls] = await Promise.all([audioPromise, ...videoTasks]);
-        const audioUrl = audioResultUrl;
+    // --- PIPELINE EXECUTION: Audio & Video chạy ĐỘC LẬP ---
+    // Audio luôn được chờ hoàn thành, không bị ảnh hưởng bởi video fail
+    const [audioResult, ...videoResults] = await Promise.allSettled([audioPromise, ...videoTasks]);
 
+    // --- Xử lý Audio (luôn lưu dù video fail) ---
+    const audioUrl = audioResult.status === 'fulfilled' ? (audioResult.value as string) : '';
+    if (audioResult.status === 'rejected') {
+        console.error('[PIPELINE-AUDIO-ERROR]', audioResult.reason);
+    } else if (audioUrl) {
+        console.log(`[PIPELINE] Audio saved successfully: ${audioUrl}`);
+    }
+
+    // --- Xử lý Video ---
+    const failedClips = videoResults.filter(r => r.status === 'rejected');
+    const succeededClips = videoResults.filter(r => r.status === 'fulfilled') as PromiseFulfilledResult<string>[];
+    const rawVideoUrls = succeededClips.map(r => r.value);
+
+    if (failedClips.length > 0) {
+        const firstError = (failedClips[0] as PromiseRejectedResult).reason;
+        console.error(`[PIPELINE-VIDEO-ERROR] ${failedClips.length}/${videoResults.length} clips failed. First error:`, firstError?.message || firstError);
+    }
+
+    // Nếu KHÔNG có clip video nào thành công
+    if (rawVideoUrls.length === 0) {
+        const videoError = (failedClips[0] as PromiseRejectedResult)?.reason;
+        await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'failed' } });
+        
+        // Vẫn lưu scene với audio nếu có
+        if (audioUrl) {
+            await prisma.videoScene.create({
+              data: {
+                generationId,
+                sceneOrder: 1,
+                visualPrompt: `Video generation failed - Audio only`,
+                audioScript: totalAudioScript,
+                videoClipUrl: '',
+                audioUrl,
+              },
+            });
+        }
+        
+        return NextResponse.json({ 
+            error: `Video generation failed: ${videoError?.message || 'Unknown error'}`,
+            audioUrl: audioUrl || undefined,
+            partialSuccess: !!audioUrl,
+        }, { status: 500 });
+    }
+
+    try {
         // --- FFmpeg STITCHING ---
         let finalVideoUrl = rawVideoUrls[0];
         const finalVideoName = `final_${finalScriptId}.mp4`;
@@ -560,7 +645,6 @@ export async function POST(req: Request) {
         fs.writeFileSync(listPath, listContent);
 
         // Nối video và lồng audio
-        // Dùng libx264 để đảm bảo tính tương thích cao nhất sau khi nối
         const mergeCmd = fs.existsSync(audioFilePath)
             ? `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v -map "[aout]" -c:v libx264 -pix_fmt yuv420p -shortest "${finalVideoPath}"`
             : `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v libx264 -pix_fmt yuv420p "${finalVideoPath}"`;
@@ -580,7 +664,7 @@ export async function POST(req: Request) {
           data: { 
             generationId, 
             sceneOrder: 1, 
-            visualPrompt: `Multi-clip Stitched (${numClips} clips)`, 
+            visualPrompt: `Multi-clip Stitched (${rawVideoUrls.length} clips)`, 
             audioScript: totalAudioScript, 
             videoClipUrl: finalVideoUrl, 
             audioUrl,
