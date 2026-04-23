@@ -12,11 +12,37 @@ interface VideoConfigSectionProps {
   setModel: (v: AIModelType) => void;
 }
 
-const MODELS = [
-  { id: 'runway', name: 'Runway Gen-3', desc: 'Sáng tạo & Nghệ thuật' },
-  { id: 'kling',  name: 'Kling AI 3.0', desc: 'Sáng tạo & Đỉnh cao' },
-  { id: 'veo',    name: 'Veo 3.1 Fast', desc: 'Tốc độ & Chất lượng' },
-] as const;
+const WORKFLOW_OPTIONS: {
+  id: AIModelType;
+  title: string;
+  desc: string;
+  tags: string[];
+}[] = [
+  {
+    id: 'runway_manual',
+    title: 'Runway + Kịch bản thủ công',
+    desc: 'Dán kịch bản có sẵn từ bên ngoài, RunwayML tạo video và FPT tạo giọng đọc.',
+    tags: ['Runway Gen-3', 'Kịch bản có sẵn', 'FPT Voice'],
+  },
+  {
+    id: 'runway_ai',
+    title: 'Runway + AI tạo kịch bản',
+    desc: 'Google Gemini tự sinh kịch bản từ chủ đề, RunwayML tạo video và FPT tạo giọng đọc.',
+    tags: ['Runway Gen-3', 'Google Gemini', 'FPT Voice'],
+  },
+  {
+    id: 'veo3',
+    title: 'Google Veo3 trực tiếp',
+    desc: 'Tạo video qua Google Veo3 (không qua Runway), Gemini sinh kịch bản, FPT tạo giọng đọc.',
+    tags: ['Veo 3', 'Google Gemini', 'FPT Voice'],
+  },
+  {
+    id: 'kling_ai',
+    title: 'Kling AI + AI tạo kịch bản',
+    desc: 'Kling AI V3 tạo video, Gemini sinh kịch bản, FPT tạo giọng đọc.',
+    tags: ['Kling AI 3', 'Google Gemini', 'FPT Voice'],
+  },
+];
 
 export const VideoConfigSection = ({
   resolution, setResolution,
@@ -31,48 +57,83 @@ export const VideoConfigSection = ({
     </div>
 
     <div className="section-card" style={{ margin: 0 }}>
-      {/* AI Model Selection */}
+      {/* Workflow Selection */}
       <div className="form-group">
-        <label className="form-label">Hệ thống AI (Model)</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
-          {MODELS.map(m => (
-            <div 
-              key={m.id}
-              onClick={() => setModel(m.id as AIModelType)}
-              style={{
-                padding: '16px 12px',
-                borderRadius: '12px',
-                border: `2px solid ${model === m.id ? '#f97316' : '#e2e8f0'}`,
-                background: model === m.id ? 'rgba(249, 115, 22, 0.05)' : 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '60px'
-              }}
-            >
-              {model === m.id && (
-                <div style={{ 
-                  position: 'absolute', top: '-10px', right: '-10px', 
-                  width: '30px', height: '30px', background: '#f97316', 
-                  transform: 'rotate(45deg)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' 
+        <label className="form-label">Chọn quy trình tạo video</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+          {WORKFLOW_OPTIONS.map(opt => {
+            const isActive = model === opt.id;
+            return (
+              <div
+                key={opt.id}
+                onClick={() => setModel(opt.id)}
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  border: `2px solid ${isActive ? '#f97316' : '#e2e8f0'}`,
+                  background: isActive ? 'rgba(249, 115, 22, 0.04)' : 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {/* Checkmark corner */}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute', top: '-10px', right: '-10px',
+                    width: '30px', height: '30px', background: '#f97316',
+                    transform: 'rotate(45deg)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+                  }}>
+                    <div style={{ transform: 'rotate(-45deg)', color: 'white', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>✓</div>
+                  </div>
+                )}
+
+                {/* Title */}
+                <div style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  color: isActive ? '#ea580c' : '#1e293b',
+                  lineHeight: 1.3,
                 }}>
-                  <div style={{ transform: 'rotate(-45deg)', color: 'white', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>✓</div>
+                  {opt.title}
                 </div>
-              )}
-              <div style={{ 
-                fontSize: '0.85rem', 
-                fontWeight: 700, 
-                color: model === m.id ? '#ea580c' : '#1e293b',
-                textAlign: 'center'
-              }}>
-                {m.name}
+
+                {/* Description */}
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#64748b',
+                  lineHeight: 1.5,
+                }}>
+                  {opt.desc}
+                </div>
+
+                {/* Tags */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                  {opt.tags.map(tag => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: isActive ? 'rgba(249, 115, 22, 0.08)' : '#f1f5f9',
+                        color: isActive ? '#ea580c' : '#64748b',
+                        border: `1px solid ${isActive ? 'rgba(249, 115, 22, 0.2)' : '#e2e8f0'}`,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -102,11 +163,10 @@ export const VideoConfigSection = ({
         <div className="form-group" style={{ marginBottom:0 }}>
           <label className="form-label">Thời lượng</label>
           <select className="form-select" value={duration} onChange={e => setDuration(e.target.value as DurationType)}>
-            <option value="5s">5 giây</option>
-            <option value="10s">10 giây</option>
             <option value="15s">15 giây</option>
             <option value="30s">30 giây</option>
             <option value="60s">60 giây</option>
+            <option value="90s">90 giây</option>
             <option value="3m">3 phút</option>
             <option value="5m">5 phút</option>
           </select>

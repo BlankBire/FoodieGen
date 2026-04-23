@@ -23,8 +23,8 @@ export default function Home() {
   // State: Video Config
   const [resolution,     setResolution]     = useState<ResolutionType>('720p')
   const [aspectRatio,    setAspectRatio]    = useState<AspectRatioType>('9:16')
-  const [duration,       setDuration]       = useState<DurationType>('5s')
-  const [model,          setModel]          = useState<AIModelType>('runway')
+  const [duration,       setDuration]       = useState<DurationType>('15s')
+  const [model,          setModel]          = useState<AIModelType>('runway_manual')
   const [activeStyle,    setActiveStyle]    = useState('cinematic')
   const [activeTone,     setActiveTone]     = useState(TONES[0])
   const [emotion,        setEmotion]        = useState('Vui tươi')
@@ -47,8 +47,7 @@ export default function Home() {
   const [mainCharacter,  setMainCharacter]  = useState('Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.')
   const [videoGenre,     setVideoGenre]     = useState('Giới thiệu món ăn')
   const [numScenes,      setNumScenes]      = useState('2 cảnh')
-  const [isMarketingMode, setIsMarketingMode] = useState(false)
-  const [referenceDoc,   setReferenceDoc]   = useState('')
+
   const [scriptId,       setScriptId]       = useState('')
   const [projectId,      setProjectId]      = useState('123e4567-e89b-12d3-a456-426614174000')
   const [script,         setScript]         = useState('')
@@ -116,8 +115,8 @@ export default function Home() {
     // Reset Video Config
     setResolution('720p')
     setAspectRatio('9:16')
-    setDuration('5s')
-    setModel('runway')
+    setDuration('15s')
+    setModel('runway_manual')
     setActiveStyle('cinematic')
     setActiveTone(TONES[0])
     setEmotion('Vui tươi')
@@ -150,8 +149,6 @@ export default function Home() {
     setStatus('')
     
     localStorage.removeItem('foodiegen_draft')
-    setIsMarketingMode(false)
-    setReferenceDoc('')
     showToast('Đã làm mới toàn bộ cài đặt.')
   }
 
@@ -238,9 +235,9 @@ export default function Home() {
           'x-google-api-key': localStorage.getItem('foodiegen_google_api_key') || ''
         },
         body: JSON.stringify({
-          topic: isMarketingMode ? referenceDoc : foodTopic,
-          isMarketingMode,
-          referenceDoc: isMarketingMode ? referenceDoc : '',
+          topic: foodTopic,
+          isMarketingMode: false,
+          referenceDoc: '',
           tone: activeTone,
           projectId: projectId,
           characterId,
@@ -293,7 +290,10 @@ export default function Home() {
       setLoading(true)
       setStatus('Đang khởi tạo Pipeline AI...')
       
-      // 1. Gửi request generate video (Runway/Kling)
+      // Map workflow model → backend engine
+      const backendModel = (model === 'runway_manual' || model === 'runway_ai') ? 'runway' : (model === 'veo3' ? 'veo' : 'kling');
+
+      // 1. Gửi request generate video
       const resVideo = await fetch(`${API_BASE}/api/generate/video`, {
         method: 'POST',
         headers: { 
@@ -312,7 +312,7 @@ export default function Home() {
             resolution,
             aspectRatio,
             duration,
-            model,
+            model: backendModel,
             style: activeStyle,
             motionIntensity,
             emotion,
@@ -374,6 +374,7 @@ export default function Home() {
             duration={duration} setDuration={setDuration}
             model={model} setModel={setModel}
           />
+
           
           <ContentSection 
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
@@ -391,10 +392,7 @@ export default function Home() {
             setVideoGenre={setVideoGenre}
             loading={loading}
             setVoiceGender={setVoiceGender}
-            isMarketingMode={isMarketingMode}
-            setIsMarketingMode={setIsMarketingMode}
-            referenceDoc={referenceDoc}
-            setReferenceDoc={setReferenceDoc}
+            model={model}
           />
 
           <VisualAudioSection 
@@ -497,7 +495,7 @@ export default function Home() {
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: '14px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>
-                Thông báo từ AI Studio
+                Thông báo từ FoodieGen
               </span>
               <p style={{ fontSize: '13px', opacity: 0.9, lineHeight: 1.4, margin: 0 }}>
                 {toast.message}
@@ -543,7 +541,8 @@ export default function Home() {
       {/* Settings Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+        onClose={() => setIsSettingsOpen(false)}
+        model={model}
       />
     </div>
   )

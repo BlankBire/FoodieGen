@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Eye, EyeOff, Save, CheckCircle2 } from 'lucide-react';
+import { X, Settings, Eye, EyeOff, Save, CheckCircle2, Lock } from 'lucide-react';
+import { AIModelType } from '../../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  model: AIModelType;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, model }) => {
   const [googleKey, setGoogleKey] = useState('');
   const [runwayKey, setRunwayKey] = useState('');
   const [fptKey, setFptKey] = useState('');
@@ -20,6 +22,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [showKlingSecret, setShowKlingSecret] = useState(false);
   
   const [isSaved, setIsSaved] = useState(false);
+
+  // Determine which API keys are needed based on model
+  const needsRunway = model === 'runway_manual' || model === 'runway_ai';
+  const needsKling = model === 'kling_ai';
+  // Google & FPT are always needed
 
   // Load keys from localStorage on mount
   useEffect(() => {
@@ -49,6 +56,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
+  const disabledInputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    paddingRight: '44px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    outline: 'none',
+    fontSize: '0.9rem',
+    transition: 'border-color 0.2s',
+    background: '#f8fafc',
+    color: '#94a3b8',
+    cursor: 'not-allowed',
+  };
+
+  const enabledInputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    paddingRight: '44px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    outline: 'none',
+    fontSize: '0.9rem',
+    transition: 'border-color 0.2s',
+  };
+
+  const renderApiInput = (
+    label: string,
+    value: string,
+    setValue: (v: string) => void,
+    show: boolean,
+    setShow: (v: boolean) => void,
+    placeholder: string,
+    enabled: boolean,
+    disabledHint?: string,
+  ) => (
+    <div className="input-group">
+      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? '#475569' : '#94a3b8', marginBottom: '8px' }}>
+        {!enabled && <Lock size={13} style={{ color: '#cbd5e1' }} />}
+        {label}
+      </label>
+      {!enabled && disabledHint && (
+        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '6px', fontStyle: 'italic' }}>
+          {disabledHint}
+        </div>
+      )}
+      <div style={{ position: 'relative' }}>
+        <input 
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder={enabled ? placeholder : 'Không cần thiết cho quy trình hiện tại'}
+          disabled={!enabled}
+          style={enabled ? enabledInputStyle : disabledInputStyle}
+        />
+        <button 
+          onClick={() => setShow(!show)}
+          disabled={!enabled}
+          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: enabled ? '#94a3b8' : '#cbd5e1', cursor: enabled ? 'pointer' : 'not-allowed' }}
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: 'fixed',
@@ -69,7 +141,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         padding: '32px',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         border: '1px solid rgba(255, 255, 255, 0.2)',
-        position: 'relative'
+        position: 'relative',
+        maxHeight: '90vh',
+        overflowY: 'auto',
       }}>
         <button onClick={onClose} style={{
           position: 'absolute',
@@ -102,156 +176,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Google Gemini Key */}
-          <div className="input-group">
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-              Google Gemini API Key
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showGoogle ? "text" : "password"}
-                value={googleKey}
-                onChange={e => setGoogleKey(e.target.value)}
-                placeholder="Nhập mã API từ Google AI Studio..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '44px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  fontSize: '0.9rem',
-                  transition: 'border-color 0.2s'
-                }}
-              />
-              <button 
-                onClick={() => setShowGoogle(!showGoogle)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                {showGoogle ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+          {/* Google Gemini Key — Always enabled */}
+          {renderApiInput(
+            'Google Gemini API Key',
+            googleKey, setGoogleKey,
+            showGoogle, setShowGoogle,
+            'Nhập mã API từ Google AI Studio...',
+            true,
+          )}
 
           {/* RunwayML Key */}
-          <div className="input-group">
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-              RunwayML API Key
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showRunway ? "text" : "password"}
-                value={runwayKey}
-                onChange={e => setRunwayKey(e.target.value)}
-                placeholder="Nhập mã API từ Runway Dashboard..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '44px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  fontSize: '0.9rem'
-                }}
-              />
-              <button 
-                onClick={() => setShowRunway(!showRunway)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                {showRunway ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+          {renderApiInput(
+            'RunwayML API Key',
+            runwayKey, setRunwayKey,
+            showRunway, setShowRunway,
+            'Nhập mã API từ Runway Dashboard...',
+            needsRunway,
+            'Chỉ cần khi chọn quy trình Runway',
+          )}
 
-          {/* FPT AI Key */}
-          <div className="input-group">
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-              FPT AI API Key (TTS)
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showFpt ? "text" : "password"}
-                value={fptKey}
-                onChange={e => setFptKey(e.target.value)}
-                placeholder="Nhập mã API từ FPT.AI Console..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '44px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  fontSize: '0.9rem'
-                }}
-              />
-              <button 
-                onClick={() => setShowFpt(!showFpt)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                {showFpt ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+          {/* FPT AI Key — Always enabled */}
+          {renderApiInput(
+            'FPT AI API Key (TTS)',
+            fptKey, setFptKey,
+            showFpt, setShowFpt,
+            'Nhập mã API từ FPT.AI Console...',
+            true,
+          )}
 
           {/* Kling AI Access Key */}
-          <div className="input-group">
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-              Kling AI Access Key
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showKlingAccess ? "text" : "password"}
-                value={klingAccessKey}
-                onChange={e => setKlingAccessKey(e.target.value)}
-                placeholder="Nhập Access Key từ Kling AI..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '44px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  fontSize: '0.9rem'
-                }}
-              />
-              <button 
-                onClick={() => setShowKlingAccess(!showKlingAccess)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                {showKlingAccess ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+          {renderApiInput(
+            'Kling AI Access Key',
+            klingAccessKey, setKlingAccessKey,
+            showKlingAccess, setShowKlingAccess,
+            'Nhập Access Key từ Kling AI...',
+            needsKling,
+            'Chỉ cần khi chọn quy trình Kling AI',
+          )}
 
           {/* Kling AI Secret Key */}
-          <div className="input-group">
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-              Kling AI Secret Key
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showKlingSecret ? "text" : "password"}
-                value={klingSecretKey}
-                onChange={e => setKlingSecretKey(e.target.value)}
-                placeholder="Nhập Secret Key từ Kling AI..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '44px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  fontSize: '0.9rem'
-                }}
-              />
-              <button 
-                onClick={() => setShowKlingSecret(!showKlingSecret)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                {showKlingSecret ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+          {renderApiInput(
+            'Kling AI Secret Key',
+            klingSecretKey, setKlingSecretKey,
+            showKlingSecret, setShowKlingSecret,
+            'Nhập Secret Key từ Kling AI...',
+            needsKling,
+            'Chỉ cần khi chọn quy trình Kling AI',
+          )}
         </div>
 
         <div style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
@@ -301,7 +272,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .input-group input:focus {
+        .input-group input:focus:not(:disabled) {
           border-color: #f97316 !important;
           box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
         }

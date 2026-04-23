@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { TONES, CHARACTERS } from '../../constants';
 import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText } from 'lucide-react';
+import { AIModelType } from '../../types';
 
 interface ContentSectionProps {
   foodTopic: string;
@@ -25,10 +26,7 @@ interface ContentSectionProps {
   setVideoGenre: (v: string) => void;
   loading: boolean;
   setVoiceGender: (v: string) => void;
-  isMarketingMode: boolean;
-  setIsMarketingMode: (v: boolean) => void;
-  referenceDoc: string;
-  setReferenceDoc: (v: string) => void;
+  model: AIModelType;
   videoScenes?: any[];
 }
 
@@ -55,14 +53,14 @@ export const ContentSection = ({
   setVideoGenre,
   loading,
   setVoiceGender,
-  isMarketingMode,
-  setIsMarketingMode,
-  referenceDoc,
-  setReferenceDoc,
+  model,
   videoScenes = []
 }: ContentSectionProps) => {
   const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
   const [selectedLocOption, setSelectedLocOption] = useState(isCustomLoc ? 'custom' : (locationContext || PRESET_LOCATIONS[0]));
+
+  // Whether this workflow uses manual script pasting (no AI generation)
+  const isManualMode = model === 'runway_manual';
 
   useEffect(() => {
     if (locationContext === '' && selectedLocOption === 'custom') return;
@@ -102,71 +100,18 @@ export const ContentSection = ({
           <span className="section-title-dot" />
           Nội dung kịch bản
         </div>
-        
-        {/* Marketing Mode Toggle */}
-        <div 
-          onClick={() => setIsMarketingMode(!isMarketingMode)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            background: isMarketingMode ? 'rgba(245, 158, 11, 0.1)' : '#f1f5f9',
-            padding: '4px 12px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            border: `1px solid ${isMarketingMode ? 'var(--amber-200)' : '#e2e8f0'}`,
-            userSelect: 'none'
-          }}
-        >
-          <span style={{ fontSize: '12px', fontWeight: 600, color: isMarketingMode ? 'var(--amber-700)' : '#475569' }}>
-            {isMarketingMode ? 'Chế độ Marketing' : 'Chế độ Sáng tạo'}
-          </span>
-          <div style={{
-            width: '28px',
-            height: '16px',
-            background: isMarketingMode ? 'var(--amber-500)' : '#cbd5e1',
-            borderRadius: '10px',
-            position: 'relative',
-            marginLeft: '4px'
-          }}>
-            <div style={{
-              width: '12px',
-              height: '12px',
-              background: 'white',
-              borderRadius: '50%',
-              position: 'absolute',
-              top: '2px',
-              left: isMarketingMode ? '14px' : '2px',
-              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-            }} />
-          </div>
-        </div>
       </div>
       
       <div className="section-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-        {/* 1. Chủ đề / Tài liệu tham khảo */}
+        {/* 1. Chủ đề */}
         <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
-          <label className="form-label">
-            {isMarketingMode ? 'Tài liệu & Thông tin sản phẩm' : 'Chủ đề món ăn'}
-          </label>
-          
-          {isMarketingMode ? (
-            <textarea 
-              className="form-textarea" 
-              placeholder="Dán nội dung bài viết, tài liệu sản phẩm hoặc mô tả chiến dịch Marketing tại đây..." 
-              style={{ minHeight: 100 }} 
-              value={referenceDoc} 
-              onChange={e => setReferenceDoc(e.target.value)} 
-            />
-          ) : (
-            <input 
-              className="form-input" 
-              placeholder="VD: Tô phở bò nóng hổi..." 
-              value={foodTopic} 
-              onChange={e => setFoodTopic(e.target.value)} 
-            />
-          )}
+          <label className="form-label">Chủ đề món ăn</label>
+          <input 
+            className="form-input" 
+            placeholder="VD: Tô phở bò nóng hổi..." 
+            value={foodTopic} 
+            onChange={e => setFoodTopic(e.target.value)} 
+          />
         </div>
 
         {/* 2. Cấu hình Nhân vật & Bối cảnh */}
@@ -277,21 +222,14 @@ export const ContentSection = ({
             <label className="form-label">Số cảnh</label>
             <select 
               className="form-select" 
-              value={isMarketingMode ? 'Gợi ý 7 cảnh' : numScenes} 
+              value={numScenes} 
               onChange={e => setNumScenes(e.target.value)}
-              disabled={isMarketingMode}
             >
-              {isMarketingMode ? (
-                <option>Tự động (7 cảnh)</option>
-              ) : (
-                <>
-                  <option>1 cảnh</option>
-                  <option>2 cảnh</option>
-                  <option>3 cảnh</option>
-                  <option>5 cảnh</option>
-                  <option>7 cảnh</option>
-                </>
-              )}
+              <option>1 cảnh</option>
+              <option>2 cảnh</option>
+              <option>3 cảnh</option>
+              <option>5 cảnh</option>
+              <option>7 cảnh</option>
             </select>
           </div>
         </div>
@@ -306,11 +244,13 @@ export const ContentSection = ({
           </div>
         </div>
 
-        {/* 5. Kịch bản chi tiết (NẰM TRONG CARD TRẮNG) */}
+        {/* 5. Kịch bản chi tiết */}
         <div style={{ background: 'rgba(245, 158, 11, 0.04)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--amber-200)' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 'var(--space-3)' }}>
-              <label className="form-label" style={{ marginBottom:0, fontWeight: 700, color: '#b45309' }}>KỊCH BẢN CHI TIẾT</label>
+              <label className="form-label" style={{ marginBottom:0, fontWeight: 700, color: '#b45309' }}>
+                {isManualMode ? 'DÁN KỊCH BẢN' : 'KỊCH BẢN CHI TIẾT'}
+              </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button 
                   className="btn-icon-small" 
@@ -322,19 +262,43 @@ export const ContentSection = ({
                   </svg>
                   Chế độ đọc
                 </button>
-                <button 
-                  className="btn-primary" 
-                  onClick={onGenerateScript}
-                  disabled={loading}
-                  style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
-                >
-                  {loading ? 'Đang tạo...' : 'AI tạo kịch bản'}
-                </button>
+                {!isManualMode && (
+                  <button 
+                    className="btn-primary" 
+                    onClick={onGenerateScript}
+                    disabled={loading}
+                    style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
+                  >
+                    {loading ? 'Đang tạo...' : 'AI tạo kịch bản'}
+                  </button>
+                )}
               </div>
             </div>
+
+            {isManualMode && (
+              <div style={{
+                background: 'rgba(249, 115, 22, 0.06)',
+                border: '1px solid rgba(249, 115, 22, 0.15)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}>
+                <FileText size={16} style={{ color: '#f97316', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.8rem', color: '#b45309', lineHeight: 1.4 }}>
+                  Chế độ thủ công - Hãy dán kịch bản có sẵn của bạn vào ô bên dưới.
+                </span>
+              </div>
+            )}
+
             <textarea 
               className="form-textarea" 
-              placeholder="Kịch bản sẽ xuất hiện tại đây..." 
+              placeholder={isManualMode 
+                ? "Dán kịch bản có sẵn từ bên ngoài vào đây... (VD: nội dung bài viết, mô tả sản phẩm, kịch bản marketing...)" 
+                : "Kịch bản sẽ xuất hiện tại đây..."
+              } 
               style={{ minHeight: 120, background: 'white', borderColor: 'var(--amber-200)' }} 
               value={script} 
               onChange={e => setScript(e.target.value)} 
