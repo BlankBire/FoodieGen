@@ -108,7 +108,7 @@ export default function Home() {
     setTimeout(() => {
       setToast(prev => prev ? { ...prev, hiding: true } : null)
       setTimeout(() => setToast(null), 500)
-    }, 3000)
+    }, 8000)
   }
 
   const handleReset = () => {
@@ -166,6 +166,7 @@ export default function Home() {
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(blobUrl)
+      showToast('Tải xuống video thành công!')
     } catch (err) {
       console.error('Download failed:', err)
       showToast('Tải xuống thất bại. Vui lòng thử lại.')
@@ -215,14 +216,20 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error(err)
-      alert('Lỗi khi lưu bản nháp: ' + err.message)
+      let msg = 'Không thể lưu bản nháp lúc này. Vui lòng thử lại sau.'
+      if (err.message?.includes('QuotaExceededError')) {
+        msg = 'Bộ nhớ trình duyệt đã đầy. Vui lòng xóa bớt dữ liệu web.'
+      } else if (err.message) {
+        msg = `Lỗi: ${err.message}` // Fallback
+      }
+      showToast(msg)
     } finally {
       setLoading(false)
     }
   }
 
   const handleGenerateScript = async () => {
-    if (!foodTopic.trim()) return alert('Vui lòng nhập món ăn/chủ đề.')
+    if (!foodTopic.trim()) return showToast('Vui lòng nhập món ăn/chủ đề.')
     
     try {
       setLoading(true)
@@ -275,11 +282,29 @@ export default function Home() {
         setScript(displayParts.join('\n\n'))
         if (data.scenes) setRawScenes(data.scenes)
         if (data.scriptId) setScriptId(data.scriptId)
-        setStatus('Kịch bản đã sẵn sàng. Hãy nhấn "Tạo video" để bắt đầu dựng phim!')
+        showToast('Tạo kịch bản thành công!')
+        setStatus('Kịch bản đã sẵn sàng.')
       }
     } catch (err: any) {
       console.error(err)
-      alert('Lỗi tạo kịch bản: ' + err.message)
+      let msg = 'Quá trình tạo kịch bản gặp lỗi. Vui lòng thử lại sau.'
+      const errorStr = err.message || '';
+      
+      if (errorStr.includes('Failed to fetch')) {
+        msg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.'
+      } else if (errorStr.includes('API key not valid') || errorStr.includes('API_KEY_INVALID')) {
+         msg = 'Google Gemini API Key không hợp lệ hoặc đã hết hạn.'
+      } else if (errorStr.includes('API Key') || errorStr.includes('api-key')) {
+         msg = 'Vui lòng cung cấp Google Gemini API Key trong phần Cấu hình API.'
+      } else if (errorStr.includes('timeout') || errorStr.toLowerCase().includes('time out')) {
+         msg = 'AI xử lý kịch bản quá lâu. Vui lòng thử lại.'
+      } else if (errorStr.includes('503') || errorStr.toLowerCase().includes('high demand') || errorStr.includes('UNAVAILABLE')) {
+         msg = 'Máy chủ AI hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.'
+      } else if (errorStr) {
+         msg = `Lỗi kịch bản: ${errorStr}`
+      }
+      
+      showToast(msg)
       setStatus('Lỗi tạo kịch bản.')
     } finally {
       setLoading(false)
@@ -287,7 +312,7 @@ export default function Home() {
   }
 
   const handleGenerateVideo = async () => {
-    if (!script.trim()) return alert('Vui lòng tạo hoặc nhập kịch bản trước.')
+    if (!script.trim()) return showToast('Vui lòng tạo hoặc nhập kịch bản trước.')
     
     try {
       setLoading(true)
@@ -357,9 +382,25 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error(err)
-      const msg = err.message.includes('API Key')
-        ? 'Không thể tạo video. Vui lòng đảm bảo bạn đã nhập đầy đủ API Key (Runway, Google, FPT) trong phần Cài đặt.'
-        : 'Quá trình tạo video gặp lỗi (có thể do hệ thống AI quá tải hoặc hết credit). Vui lòng thử lại sau.'
+      const errorStr = err.message || '';
+      let msg = 'Quá trình tạo video gặp lỗi. Vui lòng thử lại sau.';
+      
+      if (errorStr.includes('Failed to fetch')) {
+        msg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
+      } else if (errorStr.includes('API Key') || errorStr.includes('api-key')) {
+        msg = 'Không thể tạo video. Vui lòng kiểm tra lại các API Key trong phần Cấu hình API.';
+      } else if (errorStr.includes('timeout') || errorStr.toLowerCase().includes('time out')) {
+        msg = 'Hệ thống AI xử lý quá tải hoặc mất quá nhiều thời gian. Vui lòng thử lại sau ít phút.';
+      } else if (errorStr.includes('503') || errorStr.toLowerCase().includes('high demand') || errorStr.includes('UNAVAILABLE')) {
+        msg = 'Máy chủ AI hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.';
+      } else if (errorStr.includes('credit') || errorStr.includes('balance') || errorStr.includes('quota')) {
+        msg = 'Tài khoản AI của bạn đã hết Credit. Vui lòng nạp thêm.';
+      } else if (errorStr.includes('403') || errorStr.includes('not available')) {
+        msg = 'Tài khoản của bạn không có quyền sử dụng mô hình này. Vui lòng nâng cấp tài khoản AI hoặc chọn quy trình khác.';
+      } else if (errorStr) {
+        msg = `Lỗi video: ${errorStr}`
+      }
+      
       showToast(msg)
       setStatus('Lỗi tạo video.')
     } finally {

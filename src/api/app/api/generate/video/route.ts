@@ -197,7 +197,7 @@ async function generateVideoTask(
   duration: number,
   promptImage?: string
 ) {
-  const MODELS_PRIORITY = ['gen3a_turbo'];
+  const MODELS_PRIORITY = ['gen4.5'];
   let res: { id: string } | null = null;
   let lastErr: any = null;
   
@@ -272,7 +272,7 @@ async function generateKlingVideoTask(
   const body: any = {
     model: 'kling-v3', // Sử dụng model v3 mới nhất
     prompt: visualPrompt,
-    aspect_ratio: ratio === '1280:768' ? '16:9' : '9:16',
+    aspect_ratio: ratio === '1280:720' ? '16:9' : '9:16',
     duration: duration === 5 ? '5' : '10',
     mode: 'std', // Mặc định chế độ cân bằng như yêu cầu
   };
@@ -344,7 +344,7 @@ async function generateVeoVideoTask(
     prompt: visualPrompt,
     videoConfig: {
       durationSeconds: duration,
-      aspectRatio: ratio === '1280:768' ? '16:9' : '9:16',
+      aspectRatio: ratio === '1280:720' ? '16:9' : '9:16',
     }
   };
 
@@ -532,7 +532,7 @@ export async function POST(req: Request) {
     const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
     const motionIntensity = Number(config?.motionIntensity ?? 50);
     const motionKeyword = motionIntensity > 70 ? "Fluid cinematic motion" : "Stable shot, locked geometry";
-    const ratio = config?.aspectRatio === '16:9' ? '1280:768' : '768:1280';
+    const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
     const audioFileName = `fpt_${finalScriptId}.mp3`;
     const audioFilePath = path.join(audioDir, audioFileName);
     // --- RESOLVE PRODUCT IMAGE ---

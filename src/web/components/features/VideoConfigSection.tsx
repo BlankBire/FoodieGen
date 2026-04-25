@@ -32,13 +32,13 @@ const WORKFLOW_OPTIONS: {
     id: 'runway_manual',
     title: 'Runway + Kịch bản thủ công',
     desc: 'Dán kịch bản có sẵn từ bên ngoài, RunwayML tạo video và FPT tạo giọng đọc.',
-    tags: ['Runway Gen-3', 'Kịch bản có sẵn', 'FPT Voice'],
+    tags: ['Runway Gen-4.5', 'Kịch bản có sẵn', 'FPT Voice'],
   },
   {
     id: 'runway_ai',
     title: 'Runway + AI tạo kịch bản',
     desc: 'Google Gemini tự sinh kịch bản từ chủ đề, RunwayML tạo video và FPT tạo giọng đọc.',
-    tags: ['Runway Gen-3', 'Google Gemini', 'FPT Voice'],
+    tags: ['Runway Gen-4.5', 'Google Gemini', 'FPT Voice'],
   },
   {
     id: 'veo3',
@@ -209,7 +209,6 @@ export const VideoConfigSection = ({
             <select className="form-select" value={aspectRatio} onChange={e => setAspectRatio(e.target.value as AspectRatioType)}>
               <option value="9:16">9:16</option>
               <option value="16:9">16:9</option>
-              <option value="1:1">1:1</option>
             </select>
           </div>
           {/* Duration */}
