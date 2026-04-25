@@ -53,6 +53,9 @@ export async function POST(req: Request) {
       videoGenre,
       numScenes,
       productImage,
+      duration: durationInput,
+      emotion,
+      activeStyle,
     } = body;
 
     if (!topic || !projectId) {
@@ -88,8 +91,17 @@ export async function POST(req: Request) {
       sceneCount = 7;
     }
 
-    const durationRaw = String(body.duration || "10").replace(/[^0-9]/g, "");
-    let durationNum = parseInt(durationRaw) || 10;
+    const durationStr = String(durationInput || body.duration || "10");
+    let durationNum = 10;
+    // Support custom:XX format from frontend
+    const customDurMatch = durationStr.match(/^custom:(\d+)$/);
+    if (customDurMatch) {
+      durationNum = parseInt(customDurMatch[1]) || 10;
+    } else if (durationStr.includes('m')) {
+      durationNum = parseInt(durationStr) * 60;
+    } else {
+      durationNum = parseInt(durationStr.replace(/[^0-9]/g, "")) || 10;
+    }
     
     // Nếu là chế độ Marketing, thời lượng mục tiêu là 60-90s
     if (isMarketingMode) {
@@ -227,6 +239,12 @@ QUY TẮC VỀ ĐỘ DÀI:
 - Mỗi phân cảnh PHẢI bắt đầu bằng thẻ [Cảnh X] trong văn bản.
 `;
     }
+
+    // Inject custom genre, emotion, style into prompt
+    const genreNote = videoGenre ? `\nTHỂ LOẠI VIDEO: ${videoGenre}. Kịch bản phải phù hợp với thể loại này.` : '';
+    const emotionNote = emotion ? `\nCẢM XÚC CHỦ ĐẠO: ${emotion}. Toàn bộ kịch bản phải toát lên cảm xúc "${emotion}" — từ lời thoại, mô tả hình ảnh đến nhịp điệu kể chuyện.` : '';
+    const styleNote = activeStyle ? `\nPHONG CÁCH HÌNH ẢNH: ${activeStyle}. Mô tả hình ảnh trong mỗi phân cảnh phải mang phong cách "${activeStyle}".` : '';
+    basePrompt += genreNote + emotionNote + styleNote;
 
     basePrompt += `
 CHÚ Ý: Visual Description phải viết như kể một câu chuyện mượt mà, gợi hình, hoàn toàn bằng tiếng Việt.

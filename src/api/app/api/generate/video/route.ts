@@ -11,7 +11,7 @@ import { CHARACTERS, VOICES } from '../../../../lib/constants';
  * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
  * Chuyển sang v1 để tránh lỗi 404 v1beta.
  */
-async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s') {
+async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s', emotion?: string, style?: string) {
   // --- TỐI ƯU HÓA: Bỏ qua Gemini nếu rawText đã là JSON hợp lệ ---
   try {
     const parsed = JSON.parse(rawText);
@@ -34,7 +34,9 @@ YÊU CẦU:
 2. visualDescription: Miêu tả cốt truyện một cách mượt mà, gợi hình bằng TIẾNG VIỆT tự nhiên. TUYỆT ĐỐI KHÔNG chứa thuật ngữ tiếng Anh hay chỉ thị camera.
 3. technicalKeywords: Chứa toàn bộ thuật ngữ kỹ thuật tiếng Anh (Vd: macro, panning, rim light, shallow depth of field, lip-sync, active mouth movement, strict physical realism, gravity-aware, rigid object consistency, high adherence).
 4. Lời thoại (audioScript) phải tự nhiên, cô đọng. ĐẶC BIỆT: Phải giữ nguyên và lồng ghép TÊN THƯƠNG HIỆU một cách trang trọng nếu kịch bản gốc có nhắc tới.
-5. Trả về duy nhất dữ liệu dưới dạng JSON array: [{"sceneOrder":1, "title":"", "visualDescription":"", "audioScript":"", "technicalKeywords":""}].`;
+5. Trả về duy nhất dữ liệu dưới dạng JSON array: [{"sceneOrder":1, "title":"", "visualDescription":"", "audioScript":"", "technicalKeywords":""}].
+${emotion ? `6. CẢM XÚC CHỦ ĐẠO: ${emotion}. Lời thoại và hình ảnh phải toát lên cảm xúc "${emotion}".` : ''}
+${style ? `7. PHONG CÁCH HÌNH ẢNH: ${style}. Mô tả hình ảnh phải mang phong cách "${style}".` : ''}`;
 
   let result;
   let attempts = 0;
@@ -430,8 +432,16 @@ export async function POST(req: Request) {
     // --- DURATION LOGIC (STITCHING) - Moved up ---
     const durationStr = String(config?.duration || '10s');
 
+    // Convert to human-readable for Gemini prompt
+    const humanDuration = (() => {
+      const cm = durationStr.match(/^custom:(\d+)$/);
+      if (cm) return `${cm[1]} giây`;
+      if (durationStr.includes('m')) return `${parseInt(durationStr)} phút`;
+      return durationStr;
+    })();
+
      if (manualScript && manualScript.trim()) {
-        scenes = await refineManualScript(manualScript, googleApiKey || '', durationStr);
+        scenes = await refineManualScript(manualScript, googleApiKey || '', humanDuration, config?.emotion, config?.style || config?.activeStyle);
         const newScript = await prisma.videoScript.create({
           data: {
               project: { connect: { id: script?.projectId || defaultProjectId } },
@@ -491,8 +501,15 @@ export async function POST(req: Request) {
 
     // --- DURATION LOGIC (STITCHING) ---
     let totalSeconds = 10;
-    if (durationStr.includes('m')) totalSeconds = parseInt(durationStr) * 60;
-    else totalSeconds = parseInt(durationStr) || 10;
+    // Support custom:XX format from frontend
+    const customMatch = durationStr.match(/^custom:(\d+)$/);
+    if (customMatch) {
+      totalSeconds = parseInt(customMatch[1]) || 10;
+    } else if (durationStr.includes('m')) {
+      totalSeconds = parseInt(durationStr) * 60;
+    } else {
+      totalSeconds = parseInt(durationStr) || 10;
+    }
 
     const maxClipDur = selectedModel === 'veo' ? 8 : 10;
     const numClips = Math.ceil(totalSeconds / maxClipDur);
@@ -561,8 +578,9 @@ export async function POST(req: Request) {
             consistencyContext,
             `Character: ${genderInEng} ${mainCharacter}, introducing product with active visible speech and natural expressions.`,
             `Product: High adherence to source image, 100% rigid geometry, no morphing.`,
-            `Style: ${config?.activeStyle || 'cinematic'}, professional lighting. ${motionKeyword}`,
-        ].join(' ').slice(0, 1000);
+            `Style: ${config?.style || config?.activeStyle || 'cinematic'}, professional lighting. ${motionKeyword}`,
+            config?.emotion ? `Mood/Emotion: ${config.emotion} atmosphere.` : '',
+        ].filter(Boolean).join(' ').slice(0, 1000);
 
         if (selectedModel === 'kling') {
             return generateKlingVideoTask(generateKlingToken(klingAccessKey!, klingSecretKey!), visualPrompt, ratio, c.duration, productImage);
