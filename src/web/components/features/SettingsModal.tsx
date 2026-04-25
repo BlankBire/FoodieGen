@@ -37,7 +37,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
       setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
       setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
       setIsSaved(false);
+      
+      // Ngăn chặn cuộn trang chính khi mở modal
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen]);
 
   const handleSave = () => {
@@ -122,7 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   );
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{
+    <div className="modal-overlay" style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0, 0, 0, 0.4)',
