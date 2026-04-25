@@ -42,7 +42,7 @@ export const CHARACTERS = [
     id: 'lady_consultant', 
     label: 'Nữ nhân viên tư vấn sành điệu', 
     gender: 'Nữ',
-    defaultDescription: 'Nữ nhân viên tư vấn tại nhà hàng, trang phục chỉnh tề, nụ cười tỏa nắng, am hiểu thực đơn và nhiệt tình gợi ý các món đặc sản cho khách.'
+    defaultDescription: 'Nữ nhân viên tư vấn, trang phục chỉnh tề, nụ cười tỏa nắng, nhiệt tình giới thiệu các món đặc sản cho khách.'
   },
   { 
     id: 'food_reviewer', 
@@ -66,7 +66,7 @@ export const CHARACTERS = [
     id: 'mom_chef', 
     label: 'Mẹ đảm đang nội trợ', 
     gender: 'Nữ',
-    defaultDescription: 'Người mẹ nội trợ dịu dàng, trang phục ở nhà gọn gàng, khéo léo chế biến những món ăn gia đình đầy yêu thương, gương mặt hạnh phúc khi thấy con cái ăn ngon.'
+    defaultDescription: 'Người mẹ nội trợ dịu dàng, trang phục ở nhà gọn gàng, khéo léo chế biến những món ăn gia đình đầy yêu thương, gương mặt hạnh phúc.'
   },
   { 
     id: 'ai_character', 

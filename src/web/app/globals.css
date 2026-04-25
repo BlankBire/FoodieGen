@@ -1984,6 +1984,17 @@ input, textarea, select {
   transform: translateY(-1px);
 }
 
+/* Slide-down for custom input reveal */
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+  to { opacity: 1; max-height: 120px; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s var(--ease-default) both;
+  overflow: hidden;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

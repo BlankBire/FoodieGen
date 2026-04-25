@@ -32,6 +32,13 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
   const styleLabel = VISUAL_STYLES.find(s => s.id === config.activeStyle)?.label || config.activeStyle;
   const voiceLabel = VOICES.find(v => v.id === config.voiceGender)?.label || config.voiceGender;
 
+  // Format duration for display
+  const getDurationLabel = (dur: string) => {
+    const customMatch = dur.match(/^custom:(\d+)$/);
+    if (customMatch) return `${customMatch[1]}s`;
+    return dur;
+  };
+
   const getModelName = (modelId: string) => {
     switch (modelId) {
       case 'runway_manual': return 'Runway Gen-3';
@@ -96,7 +103,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
           )}
           
           <div className="preview-badge-bottom">
-            {config.aspectRatio} · {config.duration}
+            {config.aspectRatio} · {getDurationLabel(config.duration)}
           </div>
         </div>
 
@@ -199,7 +206,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Duration</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{config.duration}</span>
+              <span style={{ fontWeight: 600, color: '#d97706' }}>{getDurationLabel(config.duration)}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: '#9c7f6a' }}>Voice</span>

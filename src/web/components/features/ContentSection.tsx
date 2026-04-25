@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { TONES, CHARACTERS } from '../../constants';
-import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText } from 'lucide-react';
+import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText, Tag, Film } from 'lucide-react';
 import { AIModelType } from '../../types';
 
 interface ContentSectionProps {
@@ -38,6 +38,22 @@ const PRESET_LOCATIONS = [
   'Ngoài trời / Đường phố'
 ];
 
+const PRESET_GENRES = [
+  'Giới thiệu món ăn',
+  'Review nhà hàng',
+  'Công thức nấu ăn',
+  'Khuyến mãi',
+  'Storytelling'
+];
+
+const PRESET_SCENES = [
+  '1 cảnh',
+  '2 cảnh',
+  '3 cảnh',
+  '5 cảnh',
+  '7 cảnh'
+];
+
 export const ContentSection = ({
   foodTopic, setFoodTopic,
   mainCharacter, setMainCharacter,
@@ -56,8 +72,25 @@ export const ContentSection = ({
   model,
   videoScenes = []
 }: ContentSectionProps) => {
+  // Location custom state
   const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
   const [selectedLocOption, setSelectedLocOption] = useState(isCustomLoc ? 'custom' : (locationContext || PRESET_LOCATIONS[0]));
+
+  // Genre custom state
+  const isCustomGenre = videoGenre !== '' && !PRESET_GENRES.includes(videoGenre);
+  const [selectedGenreOption, setSelectedGenreOption] = useState(isCustomGenre ? 'custom' : videoGenre);
+  const [customGenre, setCustomGenre] = useState(isCustomGenre ? videoGenre : '');
+
+  // Scenes custom state
+  const isCustomScenes = numScenes !== '' && !PRESET_SCENES.includes(numScenes);
+  const [selectedScenesOption, setSelectedScenesOption] = useState(isCustomScenes ? 'custom' : numScenes);
+  const [customScenes, setCustomScenes] = useState(() => {
+    if (isCustomScenes) {
+      const match = numScenes.match(/^(\d+)/);
+      return match ? match[1] : '';
+    }
+    return '';
+  });
 
   // Whether this workflow uses manual script pasting (no AI generation)
   const isManualMode = model === 'runway_manual';
@@ -67,6 +100,27 @@ export const ContentSection = ({
     const isCustom = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
     setSelectedLocOption(isCustom ? 'custom' : (locationContext || PRESET_LOCATIONS[0]));
   }, [locationContext]);
+
+  useEffect(() => {
+    const isCustom = videoGenre !== '' && !PRESET_GENRES.includes(videoGenre);
+    setSelectedGenreOption(prev => {
+      if (prev === 'custom' && !isCustom) return 'custom';
+      return isCustom ? 'custom' : videoGenre;
+    });
+    if (isCustom) setCustomGenre(videoGenre);
+  }, [videoGenre]);
+
+  useEffect(() => {
+    const isCustom = numScenes !== '' && !PRESET_SCENES.includes(numScenes);
+    setSelectedScenesOption(prev => {
+      if (prev === 'custom' && !isCustom) return 'custom';
+      return isCustom ? 'custom' : numScenes;
+    });
+    if (isCustom) {
+      const match = numScenes.match(/^(\d+)/);
+      if (match) setCustomScenes(match[1]);
+    }
+  }, [numScenes]);
 
   const handleCharacterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const charId = e.target.value;
@@ -90,6 +144,38 @@ export const ContentSection = ({
       setLocationContext(val);
     } else {
       setLocationContext('');
+    }
+  };
+
+  const handleGenreOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedGenreOption(val);
+    if (val !== 'custom') {
+      setVideoGenre(val);
+    }
+    // Don't set videoGenre when switching to custom — wait for user input
+  };
+
+  const handleCustomGenreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomGenre(val);
+    setVideoGenre(val);
+  };
+
+  const handleScenesOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedScenesOption(val);
+    if (val !== 'custom') {
+      setNumScenes(val);
+    }
+    // Don't set numScenes when switching to custom — wait for user input
+  };
+
+  const handleCustomScenesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '');
+    setCustomScenes(val);
+    if (val) {
+      setNumScenes(`${val} cảnh`);
     }
   };
 
@@ -208,31 +294,74 @@ export const ContentSection = ({
             <label className="form-label">Thể loại</label>
             <select 
               className="form-select" 
-              value={videoGenre} 
-              onChange={e => setVideoGenre(e.target.value)}
+              value={selectedGenreOption} 
+              onChange={handleGenreOptionChange}
             >
-              <option>Giới thiệu món ăn</option>
-              <option>Review nhà hàng</option>
-              <option>Công thức nấu ăn</option>
-              <option>Khuyến mãi</option>
-              <option>Storytelling</option>
+              {PRESET_GENRES.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+              <option value="custom">Khác...</option>
             </select>
           </div>
           <div className="form-group" style={{ marginBottom:0 }}>
             <label className="form-label">Số cảnh</label>
             <select 
               className="form-select" 
-              value={numScenes} 
-              onChange={e => setNumScenes(e.target.value)}
+              value={selectedScenesOption} 
+              onChange={handleScenesOptionChange}
             >
-              <option>1 cảnh</option>
-              <option>2 cảnh</option>
-              <option>3 cảnh</option>
-              <option>5 cảnh</option>
-              <option>7 cảnh</option>
+              {PRESET_SCENES.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+              <option value="custom">Khác...</option>
             </select>
           </div>
         </div>
+
+        {/* Custom Genre Input */}
+        {selectedGenreOption === 'custom' && (
+          <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
+            <label className="form-label">Nhập thể loại riêng</label>
+            <div style={{ position: 'relative' }}>
+              <Tag size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--amber-500)' }} />
+              <input 
+                className="form-input" 
+                placeholder="VD: Behind the scenes, Thử thách ăn uống..." 
+                style={{ paddingLeft: '36px' }}
+                value={customGenre} 
+                onChange={handleCustomGenreChange}
+                autoFocus
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Custom Scenes Input */}
+        {selectedScenesOption === 'custom' && (
+          <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
+            <label className="form-label">Nhập số cảnh tùy chỉnh</label>
+            <div style={{ position: 'relative' }}>
+              <Film size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--amber-500)' }} />
+              <input 
+                className="form-input" 
+                type="number"
+                min={1}
+                max={20}
+                placeholder="VD: 4" 
+                style={{ paddingLeft: '36px', paddingRight: '50px' }}
+                value={customScenes} 
+                onChange={handleCustomScenesChange}
+                autoFocus
+              />
+              <span style={{ 
+                position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500, pointerEvents: 'none'
+              }}>
+                cảnh
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* 4. Tone nội dung */}
         <div className="form-group" style={{ marginBottom: 0 }}>

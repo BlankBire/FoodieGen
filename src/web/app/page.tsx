@@ -246,7 +246,10 @@ export default function Home() {
           locationContext,
           videoGenre,
           numScenes,
-          productImage
+          productImage,
+          duration,
+          emotion,
+          activeStyle
         }),
       })
       const data = await res.json()
