@@ -240,11 +240,12 @@ QUY TẮC VỀ ĐỘ DÀI:
 `;
     }
 
-    // Inject custom genre, emotion, style into prompt
+    // Inject custom genre, emotion, style, and tone into prompt
     const genreNote = videoGenre ? `\nTHỂ LOẠI VIDEO: ${videoGenre}. Kịch bản phải phù hợp với thể loại này.` : '';
     const emotionNote = emotion ? `\nCẢM XÚC CHỦ ĐẠO: ${emotion}. Toàn bộ kịch bản phải toát lên cảm xúc "${emotion}" — từ lời thoại, mô tả hình ảnh đến nhịp điệu kể chuyện.` : '';
     const styleNote = activeStyle ? `\nPHONG CÁCH HÌNH ẢNH: ${activeStyle}. Mô tả hình ảnh trong mỗi phân cảnh phải mang phong cách "${activeStyle}".` : '';
-    basePrompt += genreNote + emotionNote + styleNote;
+    const toneNote = tone ? `\nTONE NỘI DUNG: ${tone}. Giọng điệu của kịch bản (kể cả giọng lồng tiếng) phải đúng chất "${tone}".` : '';
+    basePrompt += genreNote + emotionNote + styleNote + toneNote;
 
     basePrompt += `
 CHÚ Ý: Visual Description phải viết như kể một câu chuyện mượt mà, gợi hình, hoàn toàn bằng tiếng Việt.

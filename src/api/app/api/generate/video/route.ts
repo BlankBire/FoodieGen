@@ -11,7 +11,7 @@ import { CHARACTERS, VOICES } from '../../../../lib/constants';
  * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
  * Chuyển sang v1 để tránh lỗi 404 v1beta.
  */
-async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s', emotion?: string, style?: string) {
+async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s', emotion?: string, style?: string, tone?: string) {
   // --- TỐI ƯU HÓA: Bỏ qua Gemini nếu rawText đã là JSON hợp lệ ---
   try {
     const parsed = JSON.parse(rawText);
@@ -36,7 +36,8 @@ YÊU CẦU:
 4. Lời thoại (audioScript) phải tự nhiên, cô đọng. ĐẶC BIỆT: Phải giữ nguyên và lồng ghép TÊN THƯƠNG HIỆU một cách trang trọng nếu kịch bản gốc có nhắc tới.
 5. Trả về duy nhất dữ liệu dưới dạng JSON array: [{"sceneOrder":1, "title":"", "visualDescription":"", "audioScript":"", "technicalKeywords":""}].
 ${emotion ? `6. CẢM XÚC CHỦ ĐẠO: ${emotion}. Lời thoại và hình ảnh phải toát lên cảm xúc "${emotion}".` : ''}
-${style ? `7. PHONG CÁCH HÌNH ẢNH: ${style}. Mô tả hình ảnh phải mang phong cách "${style}".` : ''}`;
+${style ? `7. PHONG CÁCH HÌNH ẢNH: ${style}. Mô tả hình ảnh phải mang phong cách "${style}".` : ''}
+${tone ? `8. TONE NỘI DUNG: ${tone}. Giọng điệu kịch bản phải chuẩn chất "${tone}".` : ''}`;
 
   let result;
   let attempts = 0;
@@ -441,7 +442,7 @@ export async function POST(req: Request) {
     })();
 
      if (manualScript && manualScript.trim()) {
-        scenes = await refineManualScript(manualScript, googleApiKey || '', humanDuration, config?.emotion, config?.style || config?.activeStyle);
+        scenes = await refineManualScript(manualScript, googleApiKey || '', humanDuration, config?.emotion, config?.style || config?.activeStyle, config?.tone);
         const newScript = await prisma.videoScript.create({
           data: {
               project: { connect: { id: script?.projectId || defaultProjectId } },
@@ -579,7 +580,10 @@ export async function POST(req: Request) {
             `Character: ${genderInEng} ${mainCharacter}, introducing product with active visible speech and natural expressions.`,
             `Product: High adherence to source image, 100% rigid geometry, no morphing.`,
             `Style: ${config?.style || config?.activeStyle || 'cinematic'}, professional lighting. ${motionKeyword}`,
-            config?.emotion ? `Mood/Emotion: ${config.emotion} atmosphere.` : '',
+            config?.emotion ? `Mood: ${config.emotion}.` : '',
+            config?.tone ? `Tone: ${config.tone}.` : '',
+            config?.transitions === false ? `No scene transitions, continuous shot.` : '',
+            config?.charConsistency ? `Strictly maintain character facial consistency.` : ''
         ].filter(Boolean).join(' ').slice(0, 1000);
 
         if (selectedModel === 'kling') {
