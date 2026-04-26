@@ -123,8 +123,8 @@ export const VideoConfigSection = ({
                   style={{
                     padding: '16px',
                     borderRadius: '14px',
-                    border: `2px solid ${isActive ? '#f97316' : '#e2e8f0'}`,
-                    background: isActive ? 'rgba(249, 115, 22, 0.04)' : 'white',
+                    border: `2px solid ${isActive ? 'var(--border-focus)' : 'var(--border-default)'}`,
+                    background: isActive ? 'rgba(249, 115, 22, 0.04)' : 'var(--bg-card)',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     position: 'relative',
@@ -149,7 +149,7 @@ export const VideoConfigSection = ({
                   <div style={{
                     fontSize: '0.85rem',
                     fontWeight: 700,
-                    color: isActive ? '#ea580c' : '#1e293b',
+                    color: isActive ? 'var(--text-accent)' : 'var(--text-primary)',
                     lineHeight: 1.3,
                   }}>
                     {opt.title}
@@ -158,7 +158,7 @@ export const VideoConfigSection = ({
                   {/* Description */}
                   <div style={{
                     fontSize: '0.75rem',
-                    color: '#64748b',
+                    color: 'var(--text-muted)',
                     lineHeight: 1.5,
                   }}>
                     {opt.desc}
@@ -174,9 +174,9 @@ export const VideoConfigSection = ({
                           fontWeight: 600,
                           padding: '3px 8px',
                           borderRadius: '6px',
-                          background: isActive ? 'rgba(249, 115, 22, 0.08)' : '#f1f5f9',
-                          color: isActive ? '#ea580c' : '#64748b',
-                          border: `1px solid ${isActive ? 'rgba(249, 115, 22, 0.2)' : '#e2e8f0'}`,
+                          background: isActive ? 'rgba(249, 115, 22, 0.08)' : 'var(--bg-input)',
+                          color: isActive ? 'var(--text-accent)' : 'var(--text-secondary)',
+                          border: `1px solid ${isActive ? 'rgba(249, 115, 22, 0.2)' : 'var(--border-default)'}`,
                           whiteSpace: 'nowrap',
                         }}
                       >

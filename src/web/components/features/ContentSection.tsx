@@ -264,7 +264,7 @@ export const ContentSection = ({
                     fontSize: '13px',
                     fontWeight: 600,
                     transition: 'all 0.2s',
-                    background: characterType === g ? 'white' : 'transparent',
+                    background: characterType === g ? 'var(--bg-card)' : 'transparent',
                     color: characterType === g ? 'var(--amber-600)' : 'var(--text-muted)',
                     boxShadow: characterType === g ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
                     border: characterType === g ? '1px solid var(--amber-200)' : '1px solid transparent'
@@ -428,7 +428,7 @@ export const ContentSection = ({
                 ? "Dán kịch bản có sẵn từ bên ngoài vào đây... (VD: nội dung bài viết, mô tả sản phẩm, kịch bản marketing...)" 
                 : "Kịch bản sẽ xuất hiện tại đây..."
               } 
-              style={{ minHeight: 120, background: 'white', borderColor: 'var(--amber-200)' }} 
+              style={{ minHeight: 120, borderColor: 'var(--border-accent)' }} 
               value={script} 
               onChange={e => setScript(e.target.value)} 
             />

@@ -1,11 +1,30 @@
-import React from 'react';
-import { Settings } from 'lucide-react';
+'use client';
+import React, { useEffect, useState } from 'react';
+import { Settings, Moon, Sun } from 'lucide-react';
 
 interface AppHeaderProps {
   onOpenSettings?: () => void;
 }
 
-export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenSettings }) => (
+export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenSettings }) => {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('foodiegen_theme');
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = saved || (systemDark ? 'dark' : 'light');
+    setTheme(initialTheme as 'light' | 'dark');
+    document.documentElement.setAttribute('data-theme', initialTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('foodiegen_theme', newTheme);
+  };
+
+  return (
   <header className="header-responsive" style={{
     textAlign: 'center',
     padding: 'var(--space-8) 0 var(--space-6)',
@@ -13,32 +32,53 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenSettings }) => (
     marginBottom: 'var(--space-6)',
     position: 'relative'
   }}>
-    <button 
-      onClick={onOpenSettings}
-      style={{
-        position: 'absolute',
-        top: '24px',
-        right: '0',
-        background: 'rgba(255, 255, 255, 0.8)',
-        border: '1px solid var(--border-default)',
-        borderRadius: '12px',
-        padding: '10px',
-        color: '#64748b',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: '0.85rem',
-        fontWeight: 500,
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-        transition: 'all 0.2s'
-      }}
-      title="Cài đặt API"
-      className="btn-settings-header"
-    >
-      <Settings size={18} />
-      <span className="hide-mobile">Cài đặt</span>
-    </button>
+    <div style={{ position: 'absolute', top: '24px', right: '0', display: 'flex', gap: '8px' }}>
+      <button 
+        onClick={toggleTheme}
+        style={{
+          background: 'var(--bg-glass)',
+          border: '1px solid var(--border-default)',
+          borderRadius: '12px',
+          padding: '10px',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--shadow-card)',
+          transition: 'all 0.2s',
+          backdropFilter: 'blur(10px)'
+        }}
+        title={theme === 'light' ? 'Bật chế độ tối' : 'Bật chế độ sáng'}
+      >
+        {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+      </button>
+
+      <button 
+        onClick={onOpenSettings}
+        style={{
+          background: 'var(--bg-glass)',
+          border: '1px solid var(--border-default)',
+          borderRadius: '12px',
+          padding: '10px',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.85rem',
+          fontWeight: 500,
+          boxShadow: 'var(--shadow-card)',
+          transition: 'all 0.2s',
+          backdropFilter: 'blur(10px)'
+        }}
+        title="Cài đặt API"
+        className="btn-settings-header"
+      >
+        <Settings size={18} />
+        <span className="hide-mobile">Cài đặt</span>
+      </button>
+    </div>
 
     <div style={{
       display: 'inline-flex',
@@ -70,4 +110,5 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenSettings }) => (
       Tạo video marketing đồ ăn tự động với AI
     </p>
   </header>
-);
+  );
+};

@@ -108,8 +108,8 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
         </div>
 
         {/* Product Image Upload */}
-        <div className="glass-card" style={{ padding: 'var(--space-5)', border: '1px solid var(--amber-100)', background: 'white' }}>
-          <h3 className="form-label" style={{ color: '#8b6d4d', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase' }}>
+        <div className="glass-card" style={{ padding: 'var(--space-5)' }}>
+          <h3 className="form-label" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase' }}>
             Hình ảnh sản phẩm mẫu
           </h3>
           
@@ -187,38 +187,38 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
         </div>
 
         {/* Configuration Summary */}
-        <div className="config-summary glass-card" style={{ padding: 'var(--space-5)', border: '1px solid var(--amber-100)', background: 'white' }}>
-          <h3 className="form-label" style={{ color: '#8b6d4d', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase' }}>
+        <div className="config-summary glass-card" style={{ padding: 'var(--space-5)' }}>
+          <h3 className="form-label" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase' }}>
             Cấu hình hiện tại
           </h3>
           <div className="summary-list" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Model</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{getModelName(config.model)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Model</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{getModelName(config.model)}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Resolution</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{config.resolution}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Resolution</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{config.resolution}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Ratio</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{config.aspectRatio}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Ratio</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{config.aspectRatio}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Duration</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{getDurationLabel(config.duration)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Duration</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{getDurationLabel(config.duration)}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Voice</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{voiceLabel}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Voice</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{voiceLabel}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Style</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{styleLabel}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Style</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{styleLabel}</span>
             </div>
             <div className="summary-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span style={{ color: '#9c7f6a' }}>Tone</span>
-              <span style={{ fontWeight: 600, color: '#d97706' }}>{config.activeTone}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Tone</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{config.activeTone}</span>
             </div>
           </div>
         </div>
