@@ -124,12 +124,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     padding: '12px 16px',
     paddingRight: '44px',
     borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--border-default)',
     outline: 'none',
     fontSize: '0.9rem',
     transition: 'border-color 0.2s',
-    background: '#f8fafc',
-    color: '#94a3b8',
+    background: 'var(--bg-base)',
+    color: 'var(--text-muted)',
     cursor: 'not-allowed',
   };
 
@@ -138,10 +138,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     padding: '12px 16px',
     paddingRight: '44px',
     borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--border-default)',
     outline: 'none',
     fontSize: '0.9rem',
     transition: 'border-color 0.2s',
+    background: 'var(--bg-input)',
+    color: 'var(--text-primary)',
   };
 
   const renderApiInput = (
@@ -158,12 +160,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     const status = provider ? testingStatus[provider] : null;
     return (
       <div className="input-group">
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? '#475569' : '#94a3b8', marginBottom: '8px' }}>
-          {!enabled && <Lock size={13} style={{ color: '#cbd5e1' }} />}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? 'var(--text-primary)' : 'var(--text-muted)', marginBottom: '8px' }}>
+          {!enabled && <Lock size={13} style={{ color: 'var(--text-muted)' }} />}
           {label}
         </label>
         {!enabled && disabledHint && (
-          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '6px', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '6px', fontStyle: 'italic' }}>
             {disabledHint}
           </div>
         )}
@@ -190,7 +192,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             <button 
               onClick={() => setShow(!show)}
               disabled={!enabled}
-              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: enabled ? '#94a3b8' : '#cbd5e1', cursor: enabled ? 'pointer' : 'not-allowed' }}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: enabled ? 'var(--text-muted)' : 'var(--border-default)', cursor: enabled ? 'pointer' : 'not-allowed' }}
             >
               {show ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -202,9 +204,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
               style={{
                 padding: '0 16px',
                 borderRadius: '12px',
-                border: 'none',
-                background: status === 'testing' ? '#e2e8f0' : (status === 'success' ? '#10b981' : (status === 'error' ? '#ef4444' : '#f1f5f9')),
-                color: status === 'testing' ? '#94a3b8' : (status === 'success' || status === 'error' ? 'white' : '#64748b'),
+                background: status === 'testing' ? 'var(--bg-base)' : (status === 'success' ? '#10b981' : (status === 'error' ? '#ef4444' : 'var(--bg-input)')),
+                color: status === 'testing' ? 'var(--text-muted)' : (status === 'success' || status === 'error' ? 'white' : 'var(--text-secondary)'),
+                border: status === 'success' || status === 'error' ? 'none' : '1px solid var(--border-default)',
                 cursor: !enabled || status === 'testing' ? 'not-allowed' : 'pointer',
                 fontWeight: 600,
                 fontSize: '0.875rem',
@@ -235,11 +237,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '520px',
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'var(--bg-surface)',
         borderRadius: '24px',
         padding: '32px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: 'var(--shadow-card)',
+        border: '1px solid var(--border-default)',
         position: 'relative',
         maxHeight: '90vh',
         overflowY: 'auto',
@@ -247,11 +249,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
         <button onClick={onClose} style={{
           position: 'absolute',
           top: '24px', right: '24px',
-          background: 'none', border: 'none',
-          color: '#64748b', cursor: 'pointer',
-          padding: '4px'
+          background: 'var(--bg-input)', border: 'none',
+          color: 'var(--text-muted)', cursor: 'pointer',
+          padding: '4px', borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '28px', height: '28px',
+          transition: 'background 0.2s'
         }}>
-          <X size={20} />
+          <X size={16} />
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
@@ -284,9 +289,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: testMessage.type === 'success' ? '#ecfdf5' : '#fef2f2',
-            color: testMessage.type === 'success' ? '#059669' : '#dc2626',
-            border: `1px solid ${testMessage.type === 'success' ? '#a7f3d0' : '#fecaca'}`
+            background: testMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            color: testMessage.type === 'success' ? '#10b981' : '#ef4444',
+            border: `1px solid ${testMessage.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
           }}>
             {testMessage.type === 'success' ? <CheckCircle2 size={16} /> : <X size={16} />}
             {testMessage.text}
@@ -387,7 +392,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
           </button>
         </div>
 
-        <p style={{ marginTop: '20px', fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', borderTop: '1px dashed #e2e8f0', paddingTop: '16px' }}>
+        <p style={{ marginTop: '20px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', borderTop: '1px dashed var(--border-default)', paddingTop: '16px' }}>
           Lưu ý: Các mã API này sẽ được lưu cục bộ trên máy tính của bạn và chỉ được sử dụng để gọi trực tiếp tới các dịch vụ AI.
         </p>
       </div>
@@ -397,8 +402,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
           to { opacity: 1; transform: translateY(0); }
         }
         .input-group input:focus:not(:disabled) {
-          border-color: #f97316 !important;
-          box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+          border-color: var(--border-focus) !important;
+          box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
         }
       `}</style>
     </div>
