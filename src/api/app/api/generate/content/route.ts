@@ -71,7 +71,7 @@ export async function POST(req: Request) {
 
     if (!apiKey) {
       throw new Error(
-        "Vui lòng nhập Google Gemini API Key trong phần Cài đặt của bạn.",
+        "[Gemini] Vui lòng nhập Google Gemini API Key trong phần Cài đặt của bạn.",
       );
     }
 
@@ -341,11 +341,11 @@ The invitation must reference the brand when available and be polite, complete, 
               "AI Studio không thể xử lý ảnh này. Đã tạo kịch bản dựa trên văn bản.";
             break;
           } catch (retryErr: any) {
-            throw new Error(`AI Retry Error: ${retryErr.message}`);
+            throw new Error(`[Gemini] AI Retry Error: ${retryErr.message}`);
           }
         } else {
           throw new Error(
-            `AI Studio Error: ${aiErr.message || "Unknown AI error"}`,
+            `[Gemini] ${aiErr.message || "Unknown AI error"}`,
           );
         }
       }
@@ -459,6 +459,7 @@ The invitation must reference the brand when available and be polite, complete, 
     return NextResponse.json(
       {
         error: error.message || "Lỗi hệ thống không xác định",
+        apiSource: 'gemini',
         details: error.stack,
         code: error.code,
       },

@@ -68,7 +68,11 @@ ${tone ? `8. TONE NỘI DUNG: ${tone}. Giọng điệu kịch bản phải chu�
         continue;
       }
       
-      throw e;
+      // Prefix error with API source for frontend identification
+      const errMsg = e.message || 'Unknown Gemini error';
+      const prefixed = new Error(`[Gemini] ${errMsg}`);
+      (prefixed as any).apiSource = 'gemini';
+      throw prefixed;
     }
   }
   
@@ -77,10 +81,12 @@ ${tone ? `8. TONE NỘI DUNG: ${tone}. Giọng điệu kịch bản phải chu�
   
   try {
     return JSON.parse(cleanJson);
-  } catch (e) {
+  } catch (e: any) {
     const match = cleanJson.match(/\[[\s\S]*\]/);
     if (match) return JSON.parse(match[0]);
-    throw new Error('Không thể parse kịch bản hiệu chỉnh từ Gemini.');
+    const parseErr = new Error('[Gemini] Không thể parse kịch bản hiệu chỉnh từ Gemini.');
+    (parseErr as any).apiSource = 'gemini';
+    throw parseErr;
   }
 }
 
@@ -183,6 +189,11 @@ async function generateAudioTask(
     } catch (err: any) {
       console.error(`[FPT-AI] [ATTEMPT ${attempt} CRITICAL]`, err.message);
       if (attempt < MAX_API_RETRIES) await new Promise(r => setTimeout(r, 2000));
+      if (attempt === MAX_API_RETRIES) {
+        const fptErr = new Error(`[FPT.ai TTS] ${err.message || 'Audio generation failed'}`);
+        (fptErr as any).apiSource = 'fpt';
+        throw fptErr;
+      }
     }
   }
   
@@ -224,12 +235,14 @@ async function generateVideoTask(
       
       if (res) break;
     } catch (e: any) {
-      lastErr = e;
+      const runwayErr = new Error(`[Runway] ${e?.message || 'Unknown Runway error'}`);
+      (runwayErr as any).apiSource = 'runway';
+      lastErr = runwayErr;
       console.warn(`[RUNWAY-TASK] ${mid} failed:`, e?.message || e);
     }
   }
 
-  if (!res) throw lastErr || new Error('Runway generation failed');
+  if (!res) throw lastErr || (() => { const e = new Error('[Runway] Runway generation failed'); (e as any).apiSource = 'runway'; return e; })();
 
   let task = await runway.tasks.retrieve(res.id);
   while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {
@@ -240,7 +253,9 @@ async function generateVideoTask(
   if (task.status === 'SUCCEEDED') {
     return (task as any).output?.[0] || '';
   }
-  throw new Error(`Runway task failed: ${task.status}`);
+  const taskErr = new Error(`[Runway] Runway task failed: ${task.status}`);
+  (taskErr as any).apiSource = 'runway';
+  throw taskErr;
 }
 
 /**
@@ -295,7 +310,7 @@ async function generateKlingVideoTask(
   });
 
   const data = await resp.json();
-  if (data.code !== 0) throw new Error(`Kling API Error: ${data.message}`);
+  if (data.code !== 0) { const kErr = new Error(`[Kling] ${data.message}`); (kErr as any).apiSource = 'kling'; throw kErr; }
 
   const taskId = data.data.task_id;
   
@@ -311,19 +326,19 @@ async function generateKlingVideoTask(
     });
     const statusData = await statusResp.json();
     
-    if (statusData.code !== 0) throw new Error(`Kling Query Error: ${statusData.message}`);
+    if (statusData.code !== 0) { const kqErr = new Error(`[Kling] ${statusData.message}`); (kqErr as any).apiSource = 'kling'; throw kqErr; }
     
     taskStatus = statusData.data.task_status;
     if (taskStatus === 'SUCCEEDED') {
       videoUrl = statusData.data.task_result.videos[0].url;
       break;
     } else if (taskStatus === 'FAILED') {
-      throw new Error(`Kling task failed: ${statusData.data.task_status_msg}`);
+      const ktErr = new Error(`[Kling] Task failed: ${statusData.data.task_status_msg}`); (ktErr as any).apiSource = 'kling'; throw ktErr;
     }
     attempts++;
   }
 
-  if (!videoUrl) throw new Error('Kling generation timed out');
+  if (!videoUrl) { const ktmErr = new Error('[Kling] Video generation timed out'); (ktmErr as any).apiSource = 'kling'; throw ktmErr; }
   return videoUrl;
 }
 
@@ -368,7 +383,7 @@ async function generateVeoVideoTask(
   });
 
   const data = await resp.json();
-  if (data.error) throw new Error(`Veo API Error: ${data.error.message}`);
+  if (data.error) { const vErr = new Error(`[Veo] ${data.error.message}`); (vErr as any).apiSource = 'veo'; throw vErr; }
 
   const operationName = data.name;
   let videoUrl = '';
@@ -379,7 +394,7 @@ async function generateVeoVideoTask(
     const statusResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`);
     const statusData = await statusResp.json();
 
-    if (statusData.error) throw new Error(`Veo Query Error: ${statusData.error.message}`);
+    if (statusData.error) { const vqErr = new Error(`[Veo] ${statusData.error.message}`); (vqErr as any).apiSource = 'veo'; throw vqErr; }
 
     if (statusData.done) {
       videoUrl = statusData.response?.video?.uri || statusData.response?.outputUri;
@@ -388,7 +403,7 @@ async function generateVeoVideoTask(
     attempts++;
   }
 
-  if (!videoUrl) throw new Error('Veo generation timed out');
+  if (!videoUrl) { const vtmErr = new Error('[Veo] Video generation timed out'); (vtmErr as any).apiSource = 'veo'; throw vtmErr; }
   return videoUrl;
 }
 
@@ -404,16 +419,19 @@ export async function POST(req: Request) {
     const klingSecretKey = req.headers.get('x-kling-secret-key');
     const hfApiKey = process.env.HUGGINGFACE_API_KEY;
 
-    if (!googleApiKey || !fptApiKey) {
-      throw new Error('Vui lòng cấu hình đầy đủ API Key (Google, FPT) trong phần Cài đặt.');
+    if (!googleApiKey) {
+      throw new Error('[Gemini] Vui lòng cấu hình Google Gemini API Key trong phần Cài đặt.');
+    }
+    if (!fptApiKey) {
+      throw new Error('[FPT.ai TTS] Vui lòng cấu hình FPT.ai API Key trong phần Cài đặt.');
     }
     
     const selectedModel = config?.model || 'runway';
     if (selectedModel === 'runway' && !runwayApiKey) {
-      throw new Error('Vui lòng cấu hình RunwayML API Key.');
+      throw new Error('[Runway] Vui lòng cấu hình RunwayML API Key trong phần Cài đặt.');
     }
     if (selectedModel === 'kling' && (!klingAccessKey || !klingSecretKey)) {
-      throw new Error('Vui lòng cấu hình Kling AI Access Key và Secret Key.');
+      throw new Error('[Kling] Vui lòng cấu hình Kling AI Access Key và Secret Key trong phần Cài đặt.');
     }
     
     let script: any = null;
@@ -636,8 +654,11 @@ export async function POST(req: Request) {
             });
         }
         
+        // Extract API source from error for frontend toast
+        const apiSource = (videoError as any)?.apiSource || 'unknown';
         return NextResponse.json({ 
-            error: `Video generation failed: ${videoError?.message || 'Unknown error'}`,
+            error: videoError?.message || 'Video generation failed',
+            apiSource,
             audioUrl: audioUrl || undefined,
             partialSuccess: !!audioUrl,
         }, { status: 500 });
@@ -703,6 +724,6 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     console.error('[API-CRITICAL]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message, apiSource: error.apiSource || 'unknown' }, { status: 500 });
   }
 }

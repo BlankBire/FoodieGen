@@ -290,18 +290,25 @@ export default function Home() {
       let msg = 'Quá trình tạo kịch bản gặp lỗi. Vui lòng thử lại sau.'
       const errorStr = err.message || '';
       
+      // Extract API source from error prefix [ApiName]
+      const apiMatch = errorStr.match(/^\[([^\]]+)\]\s*/)
+      const apiName = apiMatch ? apiMatch[1] : 'Google Gemini'
+      const cleanError = apiMatch ? errorStr.replace(apiMatch[0], '') : errorStr
+      
       if (errorStr.includes('Failed to fetch')) {
         msg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.'
-      } else if (errorStr.includes('API key not valid') || errorStr.includes('API_KEY_INVALID')) {
-         msg = 'Google Gemini API Key không hợp lệ hoặc đã hết hạn.'
-      } else if (errorStr.includes('API Key') || errorStr.includes('api-key')) {
-         msg = 'Vui lòng cung cấp Google Gemini API Key trong phần Cấu hình API.'
-      } else if (errorStr.includes('timeout') || errorStr.toLowerCase().includes('time out')) {
-         msg = 'AI xử lý kịch bản quá lâu. Vui lòng thử lại.'
-      } else if (errorStr.includes('503') || errorStr.toLowerCase().includes('high demand') || errorStr.includes('UNAVAILABLE')) {
-         msg = 'Máy chủ AI hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.'
-      } else if (errorStr) {
-         msg = `Lỗi kịch bản: ${errorStr}`
+      } else if (cleanError.includes('API key not valid') || cleanError.includes('API_KEY_INVALID')) {
+         msg = `API Key ${apiName} không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại.`
+      } else if (cleanError.includes('API Key') || cleanError.includes('api-key') || cleanError.includes('Vui lòng')) {
+         msg = cleanError // Already a user-friendly message
+      } else if (cleanError.includes('RESOURCE_EXHAUSTED') || cleanError.includes('quota') || cleanError.includes('429')) {
+         msg = `Tài khoản ${apiName} đã hết Quota/Credit. Vui lòng nạp thêm hoặc đổi API Key.`
+      } else if (cleanError.includes('timeout') || cleanError.toLowerCase().includes('time out')) {
+         msg = `${apiName} xử lý kịch bản quá lâu. Vui lòng thử lại.`
+      } else if (cleanError.includes('503') || cleanError.toLowerCase().includes('high demand') || cleanError.includes('UNAVAILABLE')) {
+         msg = `Máy chủ ${apiName} hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.`
+      } else if (cleanError) {
+         msg = `Lỗi ${apiName}: ${cleanError}`
       }
       
       showToast(msg)
@@ -385,20 +392,31 @@ export default function Home() {
       const errorStr = err.message || '';
       let msg = 'Quá trình tạo video gặp lỗi. Vui lòng thử lại sau.';
       
+      // Extract API source from error prefix [ApiName]
+      const apiMatch = errorStr.match(/^\[([^\]]+)\]\s*/)
+      const modelNameMap: Record<string, string> = { 
+        'runway_manual': 'Runway', 'runway_ai': 'Runway', 
+        'kling': 'Kling AI', 'veo3': 'Google Veo' 
+      }
+      const apiName = apiMatch ? apiMatch[1] : (modelNameMap[model] || 'AI')
+      const cleanError = apiMatch ? errorStr.replace(apiMatch[0], '') : errorStr
+      
       if (errorStr.includes('Failed to fetch')) {
         msg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
-      } else if (errorStr.includes('API Key') || errorStr.includes('api-key')) {
-        msg = 'Không thể tạo video. Vui lòng kiểm tra lại các API Key trong phần Cấu hình API.';
-      } else if (errorStr.includes('timeout') || errorStr.toLowerCase().includes('time out')) {
-        msg = 'Hệ thống AI xử lý quá tải hoặc mất quá nhiều thời gian. Vui lòng thử lại sau ít phút.';
-      } else if (errorStr.includes('503') || errorStr.toLowerCase().includes('high demand') || errorStr.includes('UNAVAILABLE')) {
-        msg = 'Máy chủ AI hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.';
-      } else if (errorStr.includes('credit') || errorStr.includes('balance') || errorStr.includes('quota')) {
-        msg = 'Tài khoản AI của bạn đã hết Credit. Vui lòng nạp thêm.';
-      } else if (errorStr.includes('403') || errorStr.includes('not available')) {
-        msg = 'Tài khoản của bạn không có quyền sử dụng mô hình này. Vui lòng nâng cấp tài khoản AI hoặc chọn quy trình khác.';
-      } else if (errorStr) {
-        msg = `Lỗi video: ${errorStr}`
+      } else if (cleanError.includes('API Key') || cleanError.includes('api-key') || cleanError.includes('Vui lòng cấu hình')) {
+        msg = cleanError; // Already user-friendly with API name
+      } else if (cleanError.includes('API key not valid') || cleanError.includes('API_KEY_INVALID') || cleanError.includes('PERMISSION_DENIED')) {
+        msg = `API Key ${apiName} không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại trong phần Cài đặt.`;
+      } else if (cleanError.includes('timeout') || cleanError.toLowerCase().includes('time out') || cleanError.includes('timed out')) {
+        msg = `${apiName} xử lý quá lâu. Vui lòng thử lại sau ít phút.`;
+      } else if (cleanError.includes('503') || cleanError.toLowerCase().includes('high demand') || cleanError.includes('UNAVAILABLE')) {
+        msg = `Máy chủ ${apiName} hiện đang quá tải. Vui lòng đợi vài phút rồi thử lại.`;
+      } else if (cleanError.includes('credit') || cleanError.includes('balance') || cleanError.includes('quota') || cleanError.includes('RESOURCE_EXHAUSTED') || cleanError.includes('429') || cleanError.includes('insufficient')) {
+        msg = `Tài khoản ${apiName} đã hết Credit/Quota. Vui lòng nạp thêm hoặc đổi API Key.`;
+      } else if (cleanError.includes('403') || cleanError.includes('not available') || cleanError.includes('forbidden')) {
+        msg = `Tài khoản ${apiName} không có quyền sử dụng mô hình này. Vui lòng nâng cấp hoặc chọn quy trình khác.`;
+      } else if (cleanError) {
+        msg = `Lỗi ${apiName}: ${cleanError}`
       }
       
       showToast(msg)
