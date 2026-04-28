@@ -49,6 +49,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     };
   }, [isOpen]);
 
+  const [testingStatus, setTestingStatus] = useState<Record<string, 'testing' | 'success' | 'error' | null>>({});
+  const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  const handleTestApi = async (provider: string) => {
+    let key = '';
+    let secret = '';
+    
+    if (provider === 'gemini') key = googleKey;
+    else if (provider === 'runway') key = runwayKey;
+    else if (provider === 'fpt') key = fptKey;
+    else if (provider === 'kling') {
+      key = klingAccessKey;
+      secret = klingSecretKey;
+    }
+
+    if (!key && provider !== 'kling') {
+        setTestMessage({ type: 'error', text: 'Vui lòng nhập API Key trước khi test.' });
+        return;
+    }
+    if (provider === 'kling' && (!key || !secret)) {
+        setTestMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ Access Key và Secret Key.' });
+        return;
+    }
+
+    setTestingStatus(prev => ({ ...prev, [provider]: 'testing' }));
+    setTestMessage(null);
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/settings/test-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, key, secret })
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setTestingStatus(prev => ({ ...prev, [provider]: 'success' }));
+        setTestMessage({ type: 'success', text: data.message || 'API Key hợp lệ!' });
+      } else {
+        throw new Error(data.error || 'Kiểm tra thất bại');
+      }
+    } catch (err: any) {
+      setTestingStatus(prev => ({ ...prev, [provider]: 'error' }));
+      setTestMessage({ type: 'error', text: err.message || 'Lỗi kết nối' });
+    }
+    
+    // Auto clear message after 5s
+    setTimeout(() => {
+      setTestMessage(null);
+    }, 5000);
+  };
+
   const handleSave = () => {
     localStorage.setItem('foodiegen_google_api_key', googleKey);
     localStorage.setItem('foodiegen_runway_api_key', runwayKey);
@@ -99,36 +153,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     placeholder: string,
     enabled: boolean,
     disabledHint?: string,
-  ) => (
-    <div className="input-group">
-      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? '#475569' : '#94a3b8', marginBottom: '8px' }}>
-        {!enabled && <Lock size={13} style={{ color: '#cbd5e1' }} />}
-        {label}
-      </label>
-      {!enabled && disabledHint && (
-        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '6px', fontStyle: 'italic' }}>
-          {disabledHint}
+    provider?: string
+  ) => {
+    const status = provider ? testingStatus[provider] : null;
+    return (
+      <div className="input-group">
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? '#475569' : '#94a3b8', marginBottom: '8px' }}>
+          {!enabled && <Lock size={13} style={{ color: '#cbd5e1' }} />}
+          {label}
+        </label>
+        {!enabled && disabledHint && (
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '6px', fontStyle: 'italic' }}>
+            {disabledHint}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input 
+              type={show ? "text" : "password"}
+              value={value}
+              onChange={e => {
+                setValue(e.target.value);
+                // Clear test status when user modifies the key
+                if (provider) {
+                  setTestingStatus(prev => ({ ...prev, [provider]: null }));
+                  setTestMessage(null);
+                } else if (label.includes('Kling AI Secret Key')) {
+                  setTestingStatus(prev => ({ ...prev, kling: null }));
+                  setTestMessage(null);
+                }
+              }}
+              placeholder={enabled ? placeholder : 'Không cần thiết cho quy trình hiện tại'}
+              disabled={!enabled}
+              style={enabled ? enabledInputStyle : disabledInputStyle}
+            />
+            <button 
+              onClick={() => setShow(!show)}
+              disabled={!enabled}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: enabled ? '#94a3b8' : '#cbd5e1', cursor: enabled ? 'pointer' : 'not-allowed' }}
+            >
+              {show ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          {provider && (
+            <button
+              onClick={() => handleTestApi(provider)}
+              disabled={!enabled || status === 'testing'}
+              style={{
+                padding: '0 16px',
+                borderRadius: '12px',
+                border: 'none',
+                background: status === 'testing' ? '#e2e8f0' : (status === 'success' ? '#10b981' : (status === 'error' ? '#ef4444' : '#f1f5f9')),
+                color: status === 'testing' ? '#94a3b8' : (status === 'success' || status === 'error' ? 'white' : '#64748b'),
+                cursor: !enabled || status === 'testing' ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                minWidth: '70px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {status === 'testing' ? '...' : 'Test'}
+            </button>
+          )}
         </div>
-      )}
-      <div style={{ position: 'relative' }}>
-        <input 
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          placeholder={enabled ? placeholder : 'Không cần thiết cho quy trình hiện tại'}
-          disabled={!enabled}
-          style={enabled ? enabledInputStyle : disabledInputStyle}
-        />
-        <button 
-          onClick={() => setShow(!show)}
-          disabled={!enabled}
-          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: enabled ? '#94a3b8' : '#cbd5e1', cursor: enabled ? 'pointer' : 'not-allowed' }}
-        >
-          {show ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="modal-overlay" style={{
@@ -144,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     }}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
         width: '100%',
-        maxWidth: '500px',
+        maxWidth: '520px',
         background: 'rgba(255, 255, 255, 0.95)',
         borderRadius: '24px',
         padding: '32px',
@@ -184,6 +274,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
           </div>
         </div>
 
+        {testMessage && (
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: '12px',
+            marginBottom: '20px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: testMessage.type === 'success' ? '#ecfdf5' : '#fef2f2',
+            color: testMessage.type === 'success' ? '#059669' : '#dc2626',
+            border: `1px solid ${testMessage.type === 'success' ? '#a7f3d0' : '#fecaca'}`
+          }}>
+            {testMessage.type === 'success' ? <CheckCircle2 size={16} /> : <X size={16} />}
+            {testMessage.text}
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Google Gemini Key — Always enabled */}
           {renderApiInput(
@@ -192,6 +301,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             showGoogle, setShowGoogle,
             'Nhập mã API từ Google AI Studio...',
             true,
+            undefined,
+            'gemini'
           )}
 
           {/* RunwayML Key */}
@@ -202,6 +313,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập mã API từ Runway Dashboard...',
             needsRunway,
             'Chỉ cần khi chọn quy trình Runway',
+            'runway'
           )}
 
           {/* FPT AI Key — Always enabled */}
@@ -211,9 +323,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             showFpt, setShowFpt,
             'Nhập mã API từ FPT.AI Console...',
             true,
+            undefined,
+            'fpt'
           )}
 
-          {/* Kling AI Access Key */}
+          {/* Kling AI Keys */}
           {renderApiInput(
             'Kling AI Access Key',
             klingAccessKey, setKlingAccessKey,
@@ -221,9 +335,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập Access Key từ Kling AI...',
             needsKling,
             'Chỉ cần khi chọn quy trình Kling AI',
+            'kling' // Provider 'kling' added to the first one, which will test both
           )}
 
-          {/* Kling AI Secret Key */}
           {renderApiInput(
             'Kling AI Secret Key',
             klingSecretKey, setKlingSecretKey,
@@ -231,6 +345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập Secret Key từ Kling AI...',
             needsKling,
             'Chỉ cần khi chọn quy trình Kling AI',
+            // No provider here so we don't duplicate the test button
           )}
         </div>
 
