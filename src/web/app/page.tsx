@@ -415,6 +415,8 @@ export default function Home() {
         msg = `Tài khoản ${apiName} đã hết Credit/Quota. Vui lòng nạp thêm hoặc đổi API Key.`;
       } else if (cleanError.includes('403') || cleanError.includes('not available') || cleanError.includes('forbidden')) {
         msg = `Tài khoản ${apiName} không có quyền sử dụng mô hình này. Vui lòng nâng cấp hoặc chọn quy trình khác.`;
+      } else if (cleanError.includes('Empty response') && cleanError.includes('404')) {
+        msg = `Tài khoản ${apiName} đang ở Free plan nên không tạo được video. Vui lòng nâng cấp lên Paid plan trên Google AI Studio.`;
       } else if (cleanError) {
         msg = `Lỗi ${apiName}: ${cleanError}`
       }

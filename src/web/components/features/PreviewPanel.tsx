@@ -41,9 +41,9 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
 
   const getModelName = (modelId: string) => {
     switch (modelId) {
-      case 'runway_manual': return 'Runway Gen-4.5';
-      case 'runway_ai':     return 'Runway Gen-4.5';
-      case 'veo3':          return 'Veo 3';
+      case 'runway_manual': return 'Gen-4 Turbo';
+      case 'runway_ai':     return 'Gen-4 Turbo';
+      case 'veo3':          return 'Veo 3 Fast';
       case 'kling_ai':      return 'Kling AI 3';
       default: return modelId;
     }

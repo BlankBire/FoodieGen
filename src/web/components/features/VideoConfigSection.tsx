@@ -33,19 +33,19 @@ const WORKFLOW_OPTIONS: {
     id: 'runway_manual',
     title: 'Runway + Kịch bản thủ công',
     desc: 'Dán kịch bản có sẵn từ bên ngoài, RunwayML tạo video và FPT tạo giọng đọc.',
-    tags: ['Runway Gen-4.5', 'Kịch bản có sẵn', 'FPT Voice'],
+    tags: ['Gen-4 Turbo', 'Kịch bản có sẵn', 'FPT Voice'],
   },
   {
     id: 'runway_ai',
     title: 'Runway + AI tạo kịch bản',
     desc: 'Google Gemini tự sinh kịch bản từ chủ đề, RunwayML tạo video và FPT tạo giọng đọc.',
-    tags: ['Runway Gen-4.5', 'Google Gemini', 'FPT Voice'],
+    tags: ['Gen-4 Turbo', 'Google Gemini', 'FPT Voice'],
   },
   {
     id: 'veo3',
-    title: 'Google Veo3 trực tiếp',
-    desc: 'Tạo video qua Google Veo3 (không qua Runway), Gemini sinh kịch bản, FPT tạo giọng đọc.',
-    tags: ['Veo 3', 'Google Gemini', 'FPT Voice'],
+    title: 'Google Veo 3 Fast',
+    desc: 'Tạo video qua Google Veo 3 Fast (không qua Runway), Gemini sinh kịch bản, FPT tạo giọng đọc.',
+    tags: ['Veo 3 Fast', 'Google Gemini', 'FPT Voice'],
   },
   {
     id: 'kling_ai',
@@ -54,6 +54,7 @@ const WORKFLOW_OPTIONS: {
     tags: ['Kling AI 3', 'Google Gemini', 'FPT Voice'],
   },
 ];
+
 
 export const VideoConfigSection = ({
   resolution, setResolution,
