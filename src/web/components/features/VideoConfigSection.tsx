@@ -14,6 +14,7 @@ interface VideoConfigSectionProps {
 }
 
 const PRESET_DURATIONS: { value: DurationType; label: string }[] = [
+  { value: '10s', label: '10 giây' },
   { value: '15s', label: '15 giây' },
   { value: '30s', label: '30 giây' },
   { value: '60s', label: '60 giây' },

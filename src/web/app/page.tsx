@@ -23,7 +23,7 @@ export default function Home() {
   // State: Video Config
   const [resolution,     setResolution]     = useState<ResolutionType>('720p')
   const [aspectRatio,    setAspectRatio]    = useState<AspectRatioType>('9:16')
-  const [duration,       setDuration]       = useState<DurationType>('15s')
+  const [duration,       setDuration]       = useState<DurationType>('10s')
   const [model,          setModel]          = useState<AIModelType>('runway_manual')
   const [activeStyle,    setActiveStyle]    = useState('cinematic')
   const [activeTone,     setActiveTone]     = useState(TONES[0])
@@ -115,7 +115,7 @@ export default function Home() {
     // Reset Video Config
     setResolution('720p')
     setAspectRatio('9:16')
-    setDuration('15s')
+    setDuration('10s')
     setModel('runway_manual')
     setActiveStyle('cinematic')
     setActiveTone(TONES[0])

@@ -30,7 +30,7 @@ async function refineManualScript(rawText: string, apiKey: string, targetDuratio
 Hãy trau chuốt kịch bản đồ ăn sau thành phiên bản Cinematic chuyên nghiệp nhưng vẫn tự nhiên: "${rawText}".
 
 YÊU CẦU:
-1. Video này có thời lượng mục tiêu là ${targetDuration}. Hãy phân tách nội dung gốc thành số lượng cảnh quay hợp lý để phủ kín thời lượng này (Ví dụ: Video 15-30s cần khoảng 3-5 cảnh, Video 3-5 phút cần ít nhất 7-10 cảnh trở lên).
+1. Video này có thời lượng mục tiêu là ${targetDuration}. Tổng lượng lời thoại (audioScript) phải vừa đủ để đọc trong đúng ${targetDuration}, KHÔNG ĐƯỢC dài hơn. Phân tách nội dung thành số cảnh hợp lý.
 2. visualDescription: Miêu tả cốt truyện một cách mượt mà, gợi hình bằng TIẾNG VIỆT tự nhiên. TUYỆT ĐỐI KHÔNG chứa thuật ngữ tiếng Anh hay chỉ thị camera.
 3. technicalKeywords: Chứa toàn bộ thuật ngữ kỹ thuật tiếng Anh (Vd: macro, panning, rim light, shallow depth of field, lip-sync, active mouth movement, strict physical realism, gravity-aware, rigid object consistency, high adherence).
 4. Lời thoại (audioScript) phải tự nhiên, cô đọng. ĐẶC BIỆT: Phải giữ nguyên và lồng ghép TÊN THƯƠNG HIỆU một cách trang trọng nếu kịch bản gốc có nhắc tới.
@@ -687,12 +687,22 @@ export async function POST(req: Request) {
         }
         fs.writeFileSync(listPath, listContent);
 
-        // Nối video và lồng audio
+        // Nối video và lồng audio - 2 bước để tránh file corrupt
+        // Bước 1: Concat video trước (không có audio)
+        const concatOnlyCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v copy -an "${finalVideoPath}.tmp.mp4"`;
+        execSync(concatOnlyCmd, { cwd: videoDir, timeout: 600000 });
+        
+        // Bước 2: Merge audio vào video, giới hạn output theo độ dài VIDEO (-shortest ở đây an toàn
+        // vì ta đã pad audio bằng apad nên audio luôn >= video, video sẽ là stream ngắn hơn)
         const mergeCmd = fs.existsSync(audioFilePath)
-            ? `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v -map "[aout]" -c:v libx264 -pix_fmt yuv420p -shortest "${finalVideoPath}"`
-            : `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v libx264 -pix_fmt yuv420p "${finalVideoPath}"`;
+            ? `"${ffmpegPath}" -y -i "${finalVideoPath}.tmp.mp4" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest "${finalVideoPath}"`
+            : `"${ffmpegPath}" -y -i "${finalVideoPath}.tmp.mp4" -c:v copy "${finalVideoPath}"`;
             
-        execSync(mergeCmd, { cwd: videoDir });
+        execSync(mergeCmd, { cwd: videoDir, timeout: 600000 });
+        
+        // Dọn dẹp file tmp
+        const tmpConcatPath = `${finalVideoPath}.tmp.mp4`;
+        if (fs.existsSync(tmpConcatPath)) fs.unlinkSync(tmpConcatPath);
         finalVideoUrl = `/videos/${finalVideoName}`;
         console.log(`[FFMPEG] STITCH SUCCESS: ${finalVideoUrl}`);
 
