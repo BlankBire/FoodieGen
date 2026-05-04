@@ -207,11 +207,17 @@ QUY TẮC PHÂN CẢNH (YÊU CẦU CHÍNH XÁC ${sceneCount} CẢNH):
 - Cảnh 1 (Product Focus): Camera Macro quay cận cảnh món ăn bám sát ảnh mẫu 100% (No deformation). Ánh sáng soft studio lighting, tập trung vào chi tiết tinh xảo.
 - Các cảnh tiếp theo: TUYỆT ĐỐI PHẢI lia máy mượt mà để tiết lộ nhân vật chính (${mainCharacter}) đang giới thiệu món ăn. Nhân vật xuất hiện trong bối cảnh ${locationContext}, nói chuyện tự nhiên (active talking persona) và giới thiệu món bánh trung thu một cách mời chào.
 
-QUY TẮC BẮT BUỘC VỀ THỜI LƯỢNG LỜI THOẠI:
-- Lời thoại (fullAudioScript): TUYỆT ĐỐI KHÔNG ĐƯỢC ngắn hơn 20 từ và không vượt quá ${maxWords} TỪ.
-- Phong cách: Viết kịch bản kiểu Marketing đầy cảm xúc, có vần điệu, nhịp điệu tiếng Việt bay bổng, tránh viết ngang hoặc liệt kê sự thật khô khan.
-- Nhấn mạnh THƯƠNG HIỆU: Luôn lồng ghép TÊN THƯƠNG HIỆU hoặc LOGO (nếu phát hiện được từ ảnh) vào lời thoại một cách trang trọng, tự hào và đầy cảm xúc. Đây là yếu tố sống còn của video quảng cáo.
-- Mục tiêu: Hoàn tất lời thoại trong ${voiceDuration} giây một cách thong thả, truyền cảm.
+QUY TẮC BẮT BUỘC VỀ CẤU TRÚC LỜI THOẠI (HOOK → GIỚI THIỆU → CTA):
+Lời thoại (fullAudioScript) PHẢI tuân theo đúng 3 phần sau — đây là công thức quảng cáo đồ ăn chuyên nghiệp:
+
+  [PHẦN 1 - HOOK] (~15% thời lượng): Câu mở đầu cực kỳ kích thích, gây tò mò hoặc đánh thẳng vào cảm giác thèm ăn / nỗi nhớ / niềm tự hào. Phải đủ mạnh để khán giả dừng lại xem. Ví dụ: "Bạn đã bao giờ cắn vào một miếng bánh mà cả tuổi thơ ùa về chưa?"
+
+  [PHẦN 2 - GIỚI THIỆU] (~65% thời lượng): Giới thiệu món ăn một cách cảm xúc, gợi vị giác — mô tả hương thơm, vị ngon, nguyên liệu đặc biệt, câu chuyện phía sau. Lồng ghép TÊN THƯƠNG HIỆU một cách tự hào, tự nhiên. Tránh liệt kê khô khan.
+
+  [PHẦN 3 - CALL TO ACTION] (~20% thời lượng): Kết thúc bằng lời kêu gọi hành động rõ ràng, ấm áp. Ví dụ: "Ghé ngay [Thương hiệu] hôm nay để cảm nhận!", "Đặt ngay trước khi hết!", "Chia sẻ ngay cho người thân yêu nhé!"
+
+- Tổng lời thoại: KHÔNG ngắn hơn 20 từ và không vượt quá ${maxWords} TỪ. Hoàn tất trong ${voiceDuration} giây đọc thong thả, truyền cảm.
+- Nhịp điệu: Có vần điệu, cảm xúc, tránh viết ngang. Nhấn mạnh THƯƠNG HIỆU một cách trang trọng, tự hào.
 
 QUY CÁCH TRẢ VỀ:
 - CHỈ TRẢ VỀ JSON. Danh sách "scenes" phải có ĐÚNG ${sceneCount} phần tử.

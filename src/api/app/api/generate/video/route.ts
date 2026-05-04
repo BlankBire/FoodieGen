@@ -208,11 +208,14 @@ async function generateVideoTask(
   duration: number,
   promptImage?: string
 ) {
-  const MODELS_PRIORITY = ['gen4.5'];
+  // gen4_turbo: rẻ hơn (5 credits/s vs 12 credits/s của gen4.5), tốc độ nhanh hơn
+  // gen4_turbo chỉ hỗ trợ Image-to-Video → nếu không có ảnh mẫu thì fallback về gen4.5
+  const model = promptImage ? 'gen4_turbo' : 'gen4.5';
   let res: { id: string } | null = null;
   let lastErr: any = null;
   
-  for (const mid of MODELS_PRIORITY) {
+  {
+    const mid = model;
     try {
       console.log(`[RUNWAY] [TASK] Model: ${mid} | I2V: ${!!promptImage} | Duration: ${duration}s | Request Sent...`);
       
@@ -225,15 +228,14 @@ async function generateVideoTask(
 
       if (promptImage) {
         payload.promptImage = promptImage;
-        // Search results indicate using client.imageToVideo for I2V
-        // If the current SDK version doesn't have it, we fallback to textToVideo as they often overlap
+        // gen4_turbo là I2V model → dùng imageToVideo SDK, fallback textToVideo nếu SDK cũ
         const method = (runway as any).imageToVideo || runway.textToVideo;
         res = await (method as any).create(payload);
       } else {
+        // Không có ảnh → gen4.5 (T2V) để đảm bảo chất lượng
         res = await (runway.textToVideo as any).create(payload);
       }
       
-      if (res) break;
     } catch (e: any) {
       const runwayErr = new Error(`[Runway] ${e?.message || 'Unknown Runway error'}`);
       (runwayErr as any).apiSource = 'runway';
@@ -352,14 +354,18 @@ async function generateVeoVideoTask(
   duration: number,
   promptImage?: string
 ) {
-  const modelId = 'veo-3.1-generate-001';
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateVideo?key=${apiKey}`;
+  // Veo models theo đúng tên Google AI Studio:
+  //   veo-3.0-fast-generate-preview → "Veo 3 Fast Generate" (~15 credits/s)
+  //   veo-3.0-generate-preview      → "Veo 3 Generate" (~40 credits/s, fallback)
+  // NOTE: Cần Paid plan để dùng Veo (Free plan quota = 0)
+  const modelId = 'placeholder'; // bị override bởi VEO_MODELS bên dưới
 
   const body: any = {
     prompt: visualPrompt,
     videoConfig: {
       durationSeconds: duration,
       aspectRatio: ratio === '1280:720' ? '16:9' : '9:16',
+      // generateAudio không được hỗ trợ ở model fast → bỏ qua, FPT.ai xử lý voice
     }
   };
 
@@ -374,36 +380,81 @@ async function generateVeoVideoTask(
     };
   }
 
-  console.log(`[VEO] [TASK] Model: ${modelId} | I2V: ${!!promptImage} | Duration: ${duration}s | Request Sent...`);
-
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  const data = await resp.json();
-  if (data.error) { const vErr = new Error(`[Veo] ${data.error.message}`); (vErr as any).apiSource = 'veo'; throw vErr; }
-
-  const operationName = data.name;
+  // Model fallback: Veo 3 Fast → Veo 3 Standard nếu fast chưa khả dụng
+  const VEO_MODELS = ['veo-3.0-fast-generate-preview', 'veo-3.0-generate-preview'];
   let videoUrl = '';
-  let attempts = 0;
+  let lastVeoErr: any = null;
 
-  while (attempts < 60) {
-    await new Promise(r => setTimeout(r, 5000));
-    const statusResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`);
-    const statusData = await statusResp.json();
+  for (const modelId of VEO_MODELS) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateVideo?key=${apiKey}`;
+      console.log(`[VEO] [TASK] Model: ${modelId} | I2V: ${!!promptImage} | Duration: ${duration}s | Request Sent...`);
 
-    if (statusData.error) { const vqErr = new Error(`[Veo] ${statusData.error.message}`); (vqErr as any).apiSource = 'veo'; throw vqErr; }
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
 
-    if (statusData.done) {
-      videoUrl = statusData.response?.video?.uri || statusData.response?.outputUri;
-      break;
+      // Đọc text trước để tránh crash nếu body rỗng hoặc không phải JSON
+      const rawText = await resp.text();
+      if (!rawText) {
+        throw new Error(`[Veo] Empty response from API (HTTP ${resp.status}) for model ${modelId}`);
+      }
+      let data: any;
+      try { data = JSON.parse(rawText); } catch {
+        throw new Error(`[Veo] Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+      }
+
+      if (data.error) {
+        const msg = data.error.message || JSON.stringify(data.error);
+        // Nếu lỗi do model không tồn tại → thử model fallback tiếp theo
+        if (resp.status === 404 || msg.includes('not found') || msg.includes('not supported')) {
+          console.warn(`[VEO] Model ${modelId} unavailable, trying fallback...`);
+          lastVeoErr = new Error(`[Veo] ${msg}`);
+          continue;
+        }
+        const vErr = new Error(`[Veo] ${msg}`);
+        (vErr as any).apiSource = 'veo';
+        throw vErr;
+      }
+
+      const operationName = data.name;
+      if (!operationName) throw new Error(`[Veo] No operation name returned by ${modelId}`);
+
+      let attempts = 0;
+      while (attempts < 60) {
+        await new Promise(r => setTimeout(r, 5000));
+        const statusResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`);
+        const statusRaw = await statusResp.text();
+        const statusData = statusRaw ? JSON.parse(statusRaw) : {};
+
+        if (statusData.error) { const vqErr = new Error(`[Veo] ${statusData.error.message}`); (vqErr as any).apiSource = 'veo'; throw vqErr; }
+
+        if (statusData.done) {
+          videoUrl = statusData.response?.video?.uri || statusData.response?.outputUri;
+          break;
+        }
+        attempts++;
+      }
+
+      if (videoUrl) break; // thành công, thoát vòng lặp model
+      lastVeoErr = new Error(`[Veo] Video generation timed out for model ${modelId}`);
+    } catch (e: any) {
+      if ((e.message || '').includes('fallback') || lastVeoErr) {
+        lastVeoErr = e;
+        continue; // thử model tiếp theo
+      }
+      (e as any).apiSource = 'veo';
+      throw e;
     }
-    attempts++;
   }
 
-  if (!videoUrl) { const vtmErr = new Error('[Veo] Video generation timed out'); (vtmErr as any).apiSource = 'veo'; throw vtmErr; }
+  if (!videoUrl) {
+    const finalErr = lastVeoErr || new Error('[Veo] All Veo models failed');
+    (finalErr as any).apiSource = 'veo';
+    throw finalErr;
+  }
   return videoUrl;
 }
 
@@ -591,25 +642,41 @@ export async function POST(req: Request) {
             ? `CONTINUITY: This is segment ${i+1} of a long sequence. Maintain exact same ${mainCharacter} appearance, clothing, and the ${locationContext} background from the previous clip. No jumping locations.` 
             : "START SCENE: High fidelity macro focus on food, then reveal character.";
 
+        // === VISUAL PROMPT - Thiết kế theo từng lớp để AI không bỏ qua nhân vật/bối cảnh ===
+        // Quan trọng: ảnh mẫu CHỈ có đồ ăn, mọi thông tin khác đều từ kịch bản
+        // → Phải đặt Character + Location TRƯỚC, rồi mới nói đến Product
         const visualPrompt = [
-            `A ${c.duration}s cinematic 4k food marketing video.`,
-            `Action: ${combinedDesc}`,
+            // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render
+            `SCENE: A ${c.duration}-second cinematic food marketing video.`,
+            `MAIN CHARACTER (REQUIRED): ${genderInEng} ${mainCharacter}.`,
+            `CHARACTER ACTION: The character is actively ${combinedDesc.slice(0, 200)}.`,
+            `CHARACTER BEHAVIOR: Visible natural facial expressions, mouth moving naturally while speaking, direct eye contact with camera.`,
+            // [2] BỐI CẢNH - Phải rõ ràng để AI tạo đúng location
+            `LOCATION & BACKGROUND (REQUIRED): ${locationContext}. The setting must be clearly established with appropriate props, lighting, and environmental details.`,
+            // [3] SẢN PHẨM - Tham chiếu ảnh mẫu nhưng là phần phụ trợ
+            productImage
+              ? `PRODUCT (use reference image as anchor): The food/product from the reference image is prominently featured. Maintain 100% geometric fidelity to the source image — no morphing, no shape changes.`
+              : `PRODUCT: ${combinedDesc.slice(200, 400)}. Photorealistic, appetizing presentation.`,
+            // [4] KỸ THUẬT & PHONG CÁCH
+            `CINEMATOGRAPHY: ${config?.style || config?.activeStyle || 'cinematic'} style. Professional 4K lighting. ${motionKeyword}.`,
             consistencyContext,
-            `Character: ${genderInEng} ${mainCharacter}, introducing product with active visible speech and natural expressions.`,
-            `Product: High adherence to source image, 100% rigid geometry, no morphing.`,
-            `Style: ${config?.style || config?.activeStyle || 'cinematic'}, professional lighting. ${motionKeyword}`,
-            config?.emotion ? `Mood: ${config.emotion}.` : '',
-            config?.tone ? `Tone: ${config.tone}.` : '',
-            config?.transitions === false ? `No scene transitions, continuous shot.` : '',
-            config?.charConsistency ? `Strictly maintain character facial consistency.` : ''
-        ].filter(Boolean).join(' ').slice(0, 1000);
+            config?.emotion ? `MOOD: ${config.emotion}.` : '',
+            config?.tone ? `TONE: ${config.tone}.` : '',
+            config?.transitions === false ? `Continuous single shot, no cuts.` : '',
+            config?.charConsistency ? `CONSISTENCY: Maintain exact character appearance across all frames.` : ''
+        ].filter(Boolean).join(' ');
+
+        // Runway API: giới hạn cứng 1000 ký tự cho promptText
+        // Veo / Kling: không có giới hạn này → cho phép tới 1500 ký tự
+        const promptMaxLen = (selectedModel === 'kling' || selectedModel === 'veo') ? 1500 : 1000;
+        const finalVisualPrompt = visualPrompt.slice(0, promptMaxLen);
 
         if (selectedModel === 'kling') {
-            return generateKlingVideoTask(generateKlingToken(klingAccessKey!, klingSecretKey!), visualPrompt, ratio, c.duration, productImage);
+            return generateKlingVideoTask(generateKlingToken(klingAccessKey!, klingSecretKey!), finalVisualPrompt, ratio, c.duration, productImage);
         } else if (selectedModel === 'veo') {
-            return generateVeoVideoTask(googleApiKey!, visualPrompt, ratio, c.duration, productImage);
+            return generateVeoVideoTask(googleApiKey!, finalVisualPrompt, ratio, c.duration, productImage);
         } else {
-            return generateVideoTask(runway, visualPrompt, ratio, c.duration, productImage);
+            return generateVideoTask(runway, finalVisualPrompt, ratio, c.duration, productImage);
         }
     });
 
