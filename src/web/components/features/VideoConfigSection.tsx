@@ -11,6 +11,7 @@ interface VideoConfigSectionProps {
   setDuration: (v: DurationType) => void;
   model: AIModelType;
   setModel: (v: AIModelType) => void;
+  runwayModelPref?: string;
 }
 
 const PRESET_DURATIONS: { value: DurationType; label: string }[] = [
@@ -60,7 +61,8 @@ export const VideoConfigSection = ({
   resolution, setResolution,
   aspectRatio, setAspectRatio,
   duration, setDuration,
-  model, setModel
+  model, setModel,
+  runwayModelPref = 'gen4_turbo'
 }: VideoConfigSectionProps) => {
   // Check if current duration is a custom value
   const isCustomDuration = !PRESET_DURATIONS.some(d => d.value === duration);
@@ -118,6 +120,9 @@ export const VideoConfigSection = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
             {WORKFLOW_OPTIONS.map(opt => {
               const isActive = model === opt.id;
+              const displayTags = opt.tags.map(tag => 
+                (tag === 'Gen-4 Turbo' && runwayModelPref === 'gen4.5') ? 'Gen 4.5' : tag
+              );
               return (
                 <div
                   key={opt.id}
@@ -168,7 +173,7 @@ export const VideoConfigSection = ({
 
                   {/* Tags */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                    {opt.tags.map(tag => (
+                    {displayTags.map(tag => (
                       <span
                         key={tag}
                         style={{

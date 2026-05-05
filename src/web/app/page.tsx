@@ -62,6 +62,7 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; hiding: boolean } | null>(null)
   const [isReadingMode, setIsReadingMode] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [runwayModelPref, setRunwayModelPref] = useState('gen4_turbo')
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,6 +73,7 @@ export default function Home() {
   }, [isReadingMode])
 
   useEffect(() => {
+    setRunwayModelPref(localStorage.getItem('foodiegen_runway_model') || 'gen4_turbo')
     const saved = localStorage.getItem('foodiegen_draft')
     if (saved) {
       try {
@@ -375,6 +377,7 @@ export default function Home() {
             aspectRatio,
             duration,
             model: backendModel,
+            runwayModel: runwayModelPref,
             style: activeStyle,
             tone: activeTone,
             motionIntensity,
@@ -463,6 +466,15 @@ export default function Home() {
     <div style={{ minHeight: '100vh', padding: '0 var(--space-6) var(--space-8)' }}>
       <AppHeader onOpenSettings={() => setIsSettingsOpen(true)} />
 
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => {
+          setIsSettingsOpen(false)
+          setRunwayModelPref(localStorage.getItem('foodiegen_runway_model') || 'gen4_turbo')
+        }} 
+        model={model} 
+      />
+
       <main className="main-grid-responsive">
         {/* LEFT — Scrollable form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
@@ -472,6 +484,7 @@ export default function Home() {
             aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
             duration={duration} setDuration={setDuration}
             model={model} setModel={setModel}
+            runwayModelPref={runwayModelPref}
           />
 
           
@@ -544,7 +557,8 @@ export default function Home() {
             model,
             voiceGender,
             activeStyle,
-            activeTone
+            activeTone,
+            runwayModel: runwayModelPref
           }} 
           onReset={handleReset}
           onDownload={handleDownload}
@@ -637,12 +651,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* Settings Modal */}
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)}
-        model={model}
-      />
+      {/* Settings Modal is rendered at the top */}
     </div>
   )
 }

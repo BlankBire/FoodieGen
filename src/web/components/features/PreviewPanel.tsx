@@ -19,6 +19,7 @@ interface PreviewPanelProps {
     voiceGender: string;
     activeStyle: string;
     activeTone: string;
+    runwayModel?: string;
   };
   onReset?: () => void;
   onDownload?: () => void;
@@ -41,8 +42,9 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
 
   const getModelName = (modelId: string) => {
     switch (modelId) {
-      case 'runway_manual': return 'Gen-4 Turbo';
-      case 'runway_ai':     return 'Gen-4 Turbo';
+      case 'runway_manual': 
+      case 'runway_ai':     
+        return config.runwayModel === 'gen4.5' ? 'Runway Gen 4.5' : 'Runway Gen-4 Turbo';
       case 'veo3':          return 'Veo 3 Fast';
       case 'kling_ai':      return 'Kling AI 3';
       default: return modelId;

@@ -14,6 +14,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   const [fptKey, setFptKey] = useState('');
   const [klingAccessKey, setKlingAccessKey] = useState('');
   const [klingSecretKey, setKlingSecretKey] = useState('');
+  const [runwayModel, setRunwayModel] = useState<'gen4.5' | 'gen4_turbo'>('gen4_turbo');
   
   const [showGoogle, setShowGoogle] = useState(false);
   const [showRunway, setShowRunway] = useState(false);
@@ -36,6 +37,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
       setFptKey(localStorage.getItem('foodiegen_fpt_api_key') || '');
       setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
       setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
+      setRunwayModel((localStorage.getItem('foodiegen_runway_model') as 'gen4.5' | 'gen4_turbo') || 'gen4_turbo');
       setIsSaved(false);
       
       // Ngăn chặn cuộn trang chính khi mở modal
@@ -109,6 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     localStorage.setItem('foodiegen_fpt_api_key', fptKey);
     localStorage.setItem('foodiegen_kling_access_key', klingAccessKey);
     localStorage.setItem('foodiegen_kling_secret_key', klingSecretKey);
+    localStorage.setItem('foodiegen_runway_model', runwayModel);
     
     setIsSaved(true);
     setTimeout(() => {
@@ -155,15 +158,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     placeholder: string,
     enabled: boolean,
     disabledHint?: string,
-    provider?: string
+    provider?: string,
+    labelRight?: React.ReactNode
   ) => {
     const status = provider ? testingStatus[provider] : null;
     return (
       <div className="input-group">
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? 'var(--text-primary)' : 'var(--text-muted)', marginBottom: '8px' }}>
-          {!enabled && <Lock size={13} style={{ color: 'var(--text-muted)' }} />}
-          {label}
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: 600, color: enabled ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {!enabled && <Lock size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+            {label}
+          </label>
+          {labelRight && <div style={{ flexShrink: 0 }}>{labelRight}</div>}
+        </div>
         {!enabled && disabledHint && (
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '6px', fontStyle: 'italic' }}>
             {disabledHint}
@@ -318,7 +325,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập mã API từ Runway Dashboard...',
             needsRunway,
             'Chỉ cần khi chọn quy trình Runway',
-            'runway'
+            'runway',
+            <div style={{ display: 'flex', gap: '6px', opacity: needsRunway ? 1 : 0.5, pointerEvents: needsRunway ? 'auto' : 'none' }}>
+              <button 
+                onClick={() => setRunwayModel('gen4_turbo')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '2px 6px', borderRadius: '100px', fontSize: '0.7rem', fontWeight: 600,
+                  border: `1px solid ${runwayModel === 'gen4_turbo' ? '#f97316' : 'var(--border-default)'}`,
+                  background: runwayModel === 'gen4_turbo' ? 'rgba(249, 115, 22, 0.1)' : 'transparent',
+                  color: runwayModel === 'gen4_turbo' ? '#f97316' : 'var(--text-secondary)',
+                  cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                Gen 4 Turbo
+                <span style={{ 
+                  background: runwayModel === 'gen4_turbo' ? '#f97316' : 'var(--bg-base)', 
+                  color: runwayModel === 'gen4_turbo' ? 'white' : 'var(--text-muted)',
+                  padding: '1px 5px', borderRadius: '10px', fontSize: '0.6rem', whiteSpace: 'nowrap'
+                }}>
+                  5 credits/s
+                </span>
+              </button>
+              <button 
+                onClick={() => setRunwayModel('gen4.5')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '2px 6px', borderRadius: '100px', fontSize: '0.7rem', fontWeight: 600,
+                  border: `1px solid ${runwayModel === 'gen4.5' ? '#f97316' : 'var(--border-default)'}`,
+                  background: runwayModel === 'gen4.5' ? 'rgba(249, 115, 22, 0.1)' : 'transparent',
+                  color: runwayModel === 'gen4.5' ? '#f97316' : 'var(--text-secondary)',
+                  cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                Gen 4.5
+                <span style={{ 
+                  background: runwayModel === 'gen4.5' ? '#f97316' : 'var(--bg-base)', 
+                  color: runwayModel === 'gen4.5' ? 'white' : 'var(--text-muted)',
+                  padding: '1px 5px', borderRadius: '10px', fontSize: '0.6rem', whiteSpace: 'nowrap'
+                }}>
+                  12 credits/s
+                </span>
+              </button>
+            </div>
           )}
 
           {/* FPT AI Key — Always enabled */}

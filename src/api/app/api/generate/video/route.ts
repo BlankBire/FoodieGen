@@ -206,11 +206,17 @@ async function generateVideoTask(
   visualPrompt: string,
   ratio: string,
   duration: number,
-  promptImage?: string
+  promptImage?: string,
+  preferredModel?: string
 ) {
-  // gen4_turbo: rẻ hơn (5 credits/s vs 12 credits/s của gen4.5), tốc độ nhanh hơn
-  // gen4_turbo chỉ hỗ trợ Image-to-Video → nếu không có ảnh mẫu thì fallback về gen4.5
-  const model = promptImage ? 'gen4_turbo' : 'gen4.5';
+  // Ưu tiên model do người dùng chọn từ giao diện (gen4_turbo hoặc gen4.5)
+  // Lưu ý: gen4_turbo CHỈ hỗ trợ Image-to-Video. Nếu user chọn gen4_turbo nhưng không up ảnh, bắt buộc fallback về gen4.5
+  let model = preferredModel || 'gen4.5';
+  if (model === 'gen4_turbo' && !promptImage) {
+    console.log('[RUNWAY] Fallback to gen4.5 because gen4_turbo requires an image.');
+    model = 'gen4.5';
+  }
+
   let res: { id: string } | null = null;
   let lastErr: any = null;
   
@@ -699,7 +705,7 @@ export async function POST(req: Request) {
         } else if (selectedModel === 'veo') {
             return generateVeoVideoTask(googleApiKey!, finalVisualPrompt, ratio, c.duration, productImage);
         } else {
-            return generateVideoTask(runway, finalVisualPrompt, ratio, c.duration, productImage);
+            return generateVideoTask(runway, finalVisualPrompt, ratio, c.duration, productImage, config?.runwayModel);
         }
     });
 
