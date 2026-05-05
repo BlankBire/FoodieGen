@@ -1,3 +1,10 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  downloadFile: (url, defaultFileName) => ipcRenderer.invoke('download-file', url, defaultFileName),
+  isElectron: true,
+});
+
 window.addEventListener('DOMContentLoaded', () => {
   const replaceText = (selector, text) => {
     const element = document.getElementById(selector);

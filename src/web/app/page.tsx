@@ -154,18 +154,45 @@ export default function Home() {
 
   const handleDownload = async () => {
     if (!videoUrl) return showToast('Chưa có video để tải.')
+    const fullUrl = videoUrl.startsWith('http') ? videoUrl : `${API_BASE}${videoUrl}`
+    const fileName = `foodiegen_video_${Date.now()}.mp4`
+
+    // Electron: dùng native Save As dialog
+    if ((window as any).electronAPI?.downloadFile) {
+      try {
+        showToast('Đang mở cửa sổ lưu file...')
+        const result = await (window as any).electronAPI.downloadFile(fullUrl, fileName)
+        if (result.success) {
+          showToast('Tải xuống video thành công!')
+        } else if (result.reason === 'canceled') {
+          showToast('Đã hủy tải xuống.')
+        } else {
+          showToast('Tải xuống thất bại: ' + (result.reason || 'Lỗi không xác định'))
+        }
+      } catch (err) {
+        console.error('Electron download failed:', err)
+        showToast('Tải xuống thất bại. Vui lòng thử lại.')
+      }
+      return
+    }
+
+    // Fallback cho trình duyệt (dev mode)
     try {
       showToast('Đang chuẩn bị tải xuống...')
-      const res = await fetch(videoUrl)
+      const res = await fetch(fullUrl)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = blobUrl
-      link.download = `foodiegen_video_${Date.now()}.mp4`
+      link.download = fileName
+      link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(blobUrl)
+      setTimeout(() => {
+        document.body.removeChild(link)
+        URL.revokeObjectURL(blobUrl)
+      }, 3000)
       showToast('Tải xuống video thành công!')
     } catch (err) {
       console.error('Download failed:', err)
@@ -359,7 +386,11 @@ export default function Home() {
             voiceSpeed,
             voiceOver,
             bgMusic,
-            productImage
+            productImage,
+            characterId,
+            characterType,
+            mainCharacter,
+            locationContext
           }
         }),
       })

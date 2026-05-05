@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
 const path = require("path");
 const { spawn, execSync } = require("child_process");
 const fs = require("fs");
@@ -262,6 +262,38 @@ function createWindow() {
 app.on("ready", async () => {
   await startApiServer();
   createWindow();
+
+  // --- IPC: Native Save As Download ---
+  ipcMain.handle('download-file', async (event, url, defaultFileName) => {
+    try {
+      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Lưu video',
+        defaultPath: defaultFileName || 'foodiegen_video.mp4',
+        filters: [
+          { name: 'Video', extensions: ['mp4'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+      if (canceled || !filePath) return { success: false, reason: 'canceled' };
+
+      // Fetch file từ API server
+      const response = await new Promise((resolve, reject) => {
+        const lib = url.startsWith('https') ? require('https') : require('http');
+        lib.get(url, (res) => {
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+          res.on('error', reject);
+        }).on('error', reject);
+      });
+
+      fs.writeFileSync(filePath, response);
+      return { success: true, filePath };
+    } catch (err) {
+      console.error('[IPC-DOWNLOAD] Error:', err.message);
+      return { success: false, reason: err.message };
+    }
+  });
 
   // Menu tùy chỉnh
   const template = [

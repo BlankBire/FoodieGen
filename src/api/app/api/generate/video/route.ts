@@ -179,11 +179,11 @@ async function generateAudioTask(
         execSync(`"${ffmpegPath}" -y -i "${rawAudioPath}" -f lavfi -t 1 -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]concat=n=2:v=0:a=1" "${audioFilePath}"`);
         if (fs.existsSync(rawAudioPath)) fs.unlinkSync(rawAudioPath);
         console.log(`[FPT-AI] [COMPLETE] Padded audio saved: ${audioFilePath}`);
-        return `/audio/fpt_${finalScriptId}.mp3`;
+        return `/api/media/audio/fpt_${finalScriptId}.mp3`;
       } catch (padErr) {
         console.error(`[FPT-AI-PAD-ERROR]`, padErr);
         fs.writeFileSync(audioFilePath, audioBuffer);
-        return `/audio/fpt_${finalScriptId}.mp3`;
+        return `/api/media/audio/fpt_${finalScriptId}.mp3`;
       }
 
     } catch (err: any) {
@@ -232,7 +232,7 @@ async function generateVideoTask(
         const method = (runway as any).imageToVideo || runway.textToVideo;
         res = await (method as any).create(payload);
       } else {
-        // Không có ảnh → gen4.5 (T2V) để đảm bảo chất lượng
+        // Không có ảnh → gen4.5 (T2V)
         res = await (runway.textToVideo as any).create(payload);
       }
       
@@ -255,7 +255,8 @@ async function generateVideoTask(
   if (task.status === 'SUCCEEDED') {
     return (task as any).output?.[0] || '';
   }
-  const taskErr = new Error(`[Runway] Runway task failed: ${task.status}`);
+  const failureReason = (task as any).failure || (task as any).failureCode || (task as any).error || 'Unknown error';
+  const taskErr = new Error(`[Runway] Runway task failed (${task.status}): ${failureReason}`);
   (taskErr as any).apiSource = 'runway';
   throw taskErr;
 }
@@ -559,15 +560,37 @@ export async function POST(req: Request) {
       const content = typeof script?.content === 'string' ? JSON.parse(script.content) : script?.content;
       return content?.config || {};
     })();
-    const characterId = configData.characterId || '';
-    const characterType = configData.characterType || '';
-    const mainCharacter = configData.mainCharacter || 'chef';
-    const locationContext = configData.locationContext || 'kitchen';
+    const characterId = config?.characterId || configData.characterId || '';
+    const characterType = config?.characterType || configData.characterType || '';
+    const mainCharacter = config?.mainCharacter || configData.mainCharacter || '';
+    const locationContext = config?.locationContext || configData.locationContext || 'A beautiful cinematic location';
 
-    // --- SOURCE OF TRUTH: Lookup gender from CHARACTERS constant ---
+    // --- SOURCE OF TRUTH: Lookup gender and English description from CHARACTERS constant ---
     const charDefinition = CHARACTERS.find((c: any) => c.id === characterId);
     const resolvedGender = charDefinition?.gender || characterType; 
     const genderInEng = resolvedGender === 'Nam' ? 'Male' : (resolvedGender === 'Nữ' ? 'Female' : '');
+    
+    // Ưu tiên dùng mô tả tiếng Anh để AI (Runway/Kling) hiểu chính xác nhân vật
+    let englishCharacterDesc = charDefinition?.englishDescription || "";
+
+    // Dịch tự động nhân vật tùy chỉnh sang tiếng Anh
+    if (!englishCharacterDesc && mainCharacter && googleApiKey) {
+      try {
+        console.log(`[PIPELINE] Translating custom character description...`);
+        const ai = new GoogleGenAI({ apiKey: googleApiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite-preview',
+            contents: `Translate this Vietnamese character description to a concise English prompt for an AI video generator. Focus on visual appearance, clothing, and expression. Max 25 words. No explanations. Description: "${mainCharacter}"`,
+        });
+        englishCharacterDesc = response.text?.trim() || `${genderInEng} character`;
+        console.log(`[PIPELINE] Translated custom character: ${englishCharacterDesc}`);
+      } catch (e) {
+        console.error('[PIPELINE] Custom char translation failed:', e);
+        englishCharacterDesc = `${genderInEng} character`;
+      }
+    } else if (!englishCharacterDesc) {
+      englishCharacterDesc = `${genderInEng} character`;
+    }
 
     // --- DURATION LOGIC (STITCHING) ---
     let totalSeconds = 10;
@@ -646,9 +669,9 @@ export async function POST(req: Request) {
         // Quan trọng: ảnh mẫu CHỈ có đồ ăn, mọi thông tin khác đều từ kịch bản
         // → Phải đặt Character + Location TRƯỚC, rồi mới nói đến Product
         const visualPrompt = [
-            // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render
+            // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render (Sử dụng tiếng Anh)
             `SCENE: A ${c.duration}-second cinematic food marketing video.`,
-            `MAIN CHARACTER (REQUIRED): ${genderInEng} ${mainCharacter}.`,
+            `MAIN CHARACTER (REQUIRED): ${englishCharacterDesc}.`,
             `CHARACTER ACTION: The character is actively ${combinedDesc.slice(0, 200)}.`,
             `CHARACTER BEHAVIOR: Visible natural facial expressions, mouth moving naturally while speaking, direct eye contact with camera.`,
             // [2] BỐI CẢNH - Phải rõ ràng để AI tạo đúng location
@@ -754,23 +777,40 @@ export async function POST(req: Request) {
         }
         fs.writeFileSync(listPath, listContent);
 
-        // Nối video và lồng audio - 2 bước để tránh file corrupt
-        // Bước 1: Concat video trước (không có audio)
-        const concatOnlyCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v copy -an "${finalVideoPath}.tmp.mp4"`;
-        execSync(concatOnlyCmd, { cwd: videoDir, timeout: 600000 });
-        
-        // Bước 2: Merge audio vào video, giới hạn output theo độ dài VIDEO (-shortest ở đây an toàn
-        // vì ta đã pad audio bằng apad nên audio luôn >= video, video sẽ là stream ngắn hơn)
+        // Nối video và lồng audio
+        // Nếu chỉ có 1 clip → dùng trực tiếp, bỏ qua bước concat để tránh file corrupt
+        let rawVideoOnlyPath: string;
+
+        if (rawVideoUrls.length === 1) {
+            // Trường hợp 1 clip: download và dùng trực tiếp
+            rawVideoOnlyPath = path.join(videoDir, `part_0_${finalScriptId}.mp4`);
+            console.log(`[FFMPEG] Single clip — skipping concat, using downloaded file directly.`);
+        } else {
+            // Trường hợp nhiều clip: Bước 1 — Concat video (không có audio)
+            rawVideoOnlyPath = `${finalVideoPath}.tmp.mp4`;
+            // Tạo list.txt với absolute path để tránh lỗi path resolution trên Windows
+            const listContent2 = rawVideoUrls.map((_, i) =>
+                `file '${path.join(videoDir, `part_${i}_${finalScriptId}.mp4`).replace(/\\/g, '/')}'`
+            ).join('\n');
+            fs.writeFileSync(listPath, listContent2);
+            const concatOnlyCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${listPath}" -c:v copy -an "${rawVideoOnlyPath}"`;
+            console.log(`[FFMPEG] Concat ${rawVideoUrls.length} clips...`);
+            execSync(concatOnlyCmd, { cwd: videoDir, timeout: 600000 });
+        }
+
+        // Bước cuối: Merge audio vào video
+        // -movflags +faststart: đảm bảo moov atom ở đầu file → không bị corrupt khi phát
         const mergeCmd = fs.existsSync(audioFilePath)
-            ? `"${ffmpegPath}" -y -i "${finalVideoPath}.tmp.mp4" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest "${finalVideoPath}"`
-            : `"${ffmpegPath}" -y -i "${finalVideoPath}.tmp.mp4" -c:v copy "${finalVideoPath}"`;
+            ? `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart "${finalVideoPath}"`
+            : `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -c:v copy -movflags +faststart "${finalVideoPath}"`;
             
+        console.log(`[FFMPEG] Merging audio: ${fs.existsSync(audioFilePath) ? 'YES' : 'NO AUDIO'}`);
         execSync(mergeCmd, { cwd: videoDir, timeout: 600000 });
         
         // Dọn dẹp file tmp
         const tmpConcatPath = `${finalVideoPath}.tmp.mp4`;
         if (fs.existsSync(tmpConcatPath)) fs.unlinkSync(tmpConcatPath);
-        finalVideoUrl = `/videos/${finalVideoName}`;
+        finalVideoUrl = `/api/media/videos/${finalVideoName}`;
         console.log(`[FFMPEG] STITCH SUCCESS: ${finalVideoUrl}`);
 
         // Cleanup

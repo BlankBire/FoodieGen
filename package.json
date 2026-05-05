@@ -78,6 +78,10 @@
       {
         "from": "src/api/.next/static",
         "to": "api-server/.next/static"
+      },
+      {
+        "from": "bin/ffmpeg.exe",
+        "to": "api-server/bin/ffmpeg.exe"
       }
     ],
     "win": {
