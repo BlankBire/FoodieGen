@@ -26,11 +26,23 @@ async function refineManualScript(rawText: string, apiKey: string, targetDuratio
   const ai = new GoogleGenAI({ apiKey }); 
   const modelId = 'gemini-3.1-flash-lite-preview'; 
   
+  // Tính toán số từ cần thiết để đọc vừa với thời lượng (tốc độ đọc trung bình ~3.2 từ/giây)
+  let durationSeconds = 10;
+  if (targetDuration.startsWith('custom:')) {
+    durationSeconds = parseInt(targetDuration.split(':')[1]) || 10;
+  } else if (targetDuration.endsWith('s')) {
+    durationSeconds = parseInt(targetDuration.replace('s', '')) || 10;
+  } else if (targetDuration.endsWith('m')) {
+    durationSeconds = (parseInt(targetDuration.replace('m', '')) || 1) * 60;
+  }
+  const targetWordCount = Math.floor(durationSeconds * 3.2);
+  const minWordCount = Math.floor(targetWordCount * 0.85);
+
   const prompt = `Bạn là chuyên gia hiệu đính kịch bản điện ảnh. 
 Hãy trau chuốt kịch bản đồ ăn sau thành phiên bản Cinematic chuyên nghiệp nhưng vẫn tự nhiên: "${rawText}".
 
 YÊU CẦU:
-1. Video này có thời lượng mục tiêu là ${targetDuration}. Tổng lượng lời thoại (audioScript) phải vừa đủ để đọc trong đúng ${targetDuration}, KHÔNG ĐƯỢC dài hơn. Phân tách nội dung thành số cảnh hợp lý.
+1. Video này có thời lượng mục tiêu là ${durationSeconds} giây. Để khớp chính xác với tốc độ đọc của AI Voice, tổng số từ tiếng Việt của tất cả lời thoại (audioScript) PHẢI nằm trong khoảng từ ${minWordCount} đến ${targetWordCount} từ. KHÔNG viết quá ngắn (tránh video bị im lặng ở đoạn cuối) và KHÔNG viết quá dài (tránh bị cắt tiếng). Phân tách nội dung thành số cảnh hợp lý.
 2. visualDescription: Miêu tả cốt truyện một cách mượt mà, gợi hình bằng TIẾNG VIỆT tự nhiên. TUYỆT ĐỐI KHÔNG chứa thuật ngữ tiếng Anh hay chỉ thị camera.
 3. technicalKeywords: Chứa toàn bộ thuật ngữ kỹ thuật tiếng Anh (Vd: macro, panning, rim light, shallow depth of field, lip-sync, active mouth movement, strict physical realism, gravity-aware, rigid object consistency, high adherence).
 4. Lời thoại (audioScript) phải tự nhiên, cô đọng. ĐẶC BIỆT: Phải giữ nguyên và lồng ghép TÊN THƯƠNG HIỆU một cách trang trọng nếu kịch bản gốc có nhắc tới.
@@ -253,9 +265,30 @@ async function generateVideoTask(
   if (!res) throw lastErr || (() => { const e = new Error('[Runway] Runway generation failed'); (e as any).apiSource = 'runway'; return e; })();
 
   let task = await runway.tasks.retrieve(res.id);
+  let pollErrorCount = 0;
+  const MAX_POLL_ERRORS = 15; // Giới hạn 15 lần lỗi liên tiếp (chịu đựng mất kết nối khoảng 1.5 phút)
+
   while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {
     await new Promise(r => setTimeout(r, 5000)); // Optimized to 5s
-    task = await runway.tasks.retrieve(res.id);
+    try {
+      task = await runway.tasks.retrieve(res.id);
+      pollErrorCount = 0; // Gọi thành công -> reset bộ đếm
+    } catch (pollErr: any) {
+      pollErrorCount++;
+      console.warn(`[RUNWAY] Poll error for task ${res.id} (Count: ${pollErrorCount}/${MAX_POLL_ERRORS}):`, pollErr.message);
+      
+      if (pollErrorCount >= MAX_POLL_ERRORS) {
+        const finalErr = new Error(`Runway API Timeout/Error persisted after ${MAX_POLL_ERRORS} attempts: ${pollErr.message}`);
+        (finalErr as any).apiSource = 'runway';
+        throw finalErr;
+      }
+
+      // Bỏ qua lỗi timeout (Request timed out) hoặc lỗi server từ Runway để không làm crash pipeline
+      if (pollErr.message?.toLowerCase().includes('timeout') || pollErr.status >= 500 || pollErr.status === 429) {
+        continue;
+      }
+      throw pollErr;
+    }
   }
 
   if (task.status === 'SUCCEEDED') {

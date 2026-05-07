@@ -58,12 +58,15 @@ export async function POST(req: Request) {
       activeStyle,
     } = body;
 
-    if (!topic || !projectId) {
+    if (!topic) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: topic" },
         { status: 400 },
       );
     }
+
+    // Generate standard UUID for the project if not provided
+    const finalProjectId = projectId || crypto.randomUUID();
 
     // 1. Initialize New GenAI SDK (Google AI Studio Mode)
     const headerApiKey = req.headers.get("x-google-api-key");
@@ -402,26 +405,26 @@ The invitation must reference the brand when available and be polite, complete, 
     }
 
     // 2. Ensure Project Exists
-    console.log("[V8-DEBUG] Verifying Project:", projectId);
+    console.log("[V8-DEBUG] Verifying Project:", finalProjectId);
     const existingProject = await prisma.videoProject.findUnique({
-      where: { id: projectId },
+      where: { id: finalProjectId },
     });
     if (!existingProject) {
-      console.log("[V8-DEBUG] Creating dummy user/project for:", projectId);
+      console.log("[V8-DEBUG] Creating dummy user/project for:", finalProjectId);
       await prisma.user.upsert({
-        where: { id: projectId },
+        where: { id: finalProjectId },
         update: {},
         create: {
-          id: projectId,
-          email: `test_${projectId}@foodiegen.com`,
+          id: finalProjectId,
+          email: `test_${finalProjectId}@foodiegen.com`,
           fullName: "Test Component",
           passwordHash: "dummy",
         },
       });
       await prisma.videoProject.create({
         data: {
-          id: projectId,
-          userId: projectId,
+          id: finalProjectId,
+          userId: finalProjectId,
           title: "Auto-Generated Test Project",
           status: "draft",
         },
@@ -432,7 +435,7 @@ The invitation must reference the brand when available and be polite, complete, 
     console.log("[V8-DEBUG] Saving script to DB...");
     const script = await prisma.videoScript.create({
       data: {
-        projectId,
+        projectId: finalProjectId,
         content: JSON.stringify({
           scenes,
           fullAudioScript,
@@ -453,7 +456,7 @@ The invitation must reference the brand when available and be polite, complete, 
 
     console.log("[V8-DEBUG] SUCCESS. Script ID:", script.id);
     return NextResponse.json({
-      projectId,
+      projectId: finalProjectId,
       scriptId: script.id,
       scenes,
       fullAudioScript,

@@ -68,5 +68,70 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "API is ready!" });
+  try {
+    const defaultUserId = "123e4567-e89b-12d3-a456-426614174000";
+    
+    const projects = await prisma.videoProject.findMany({
+      where: {
+        userId: defaultUserId,
+        status: "draft"
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      },
+      include: {
+        scripts: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    return NextResponse.json({ success: true, data: projects });
+  } catch (error: any) {
+    console.error("[GET-DRAFT-ERROR]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const projectId = searchParams.get('projectId');
+    
+    if (!projectId) {
+      return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
+    }
+
+    await prisma.videoProject.delete({
+      where: { id: projectId }
+    });
+
+    return NextResponse.json({ success: true, message: "Đã xóa bản nháp" });
+  } catch (error: any) {
+    console.error("[DELETE-DRAFT-ERROR]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const { projectId, newTitle } = await req.json();
+
+    if (!projectId || !newTitle) {
+      return NextResponse.json({ error: "Missing projectId or newTitle" }, { status: 400 });
+    }
+
+    const project = await prisma.videoProject.update({
+      where: { id: projectId },
+      data: {
+        title: newTitle
+      }
+    });
+
+    return NextResponse.json({ success: true, project, message: "Đã đổi tên bản nháp" });
+  } catch (error: any) {
+    console.error("[RENAME-DRAFT-ERROR]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
