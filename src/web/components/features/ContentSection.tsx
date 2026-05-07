@@ -4,6 +4,7 @@ import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText, Tag,
 import { AIModelType } from '../../types';
 
 interface ContentSectionProps {
+  duration?: string;
   foodTopic: string;
   setFoodTopic: (v: string) => void;
   mainCharacter: string;
@@ -55,6 +56,7 @@ const PRESET_SCENES = [
 ];
 
 export const ContentSection = ({
+  duration,
   foodTopic, setFoodTopic,
   mainCharacter, setMainCharacter,
   characterId, setCharacterId,
@@ -309,6 +311,12 @@ export const ContentSection = ({
               className="form-select" 
               value={selectedScenesOption} 
               onChange={handleScenesOptionChange}
+              disabled={duration === '10s' || duration === '15s'}
+              style={{
+                opacity: (duration === '10s' || duration === '15s') ? 0.65 : 1,
+                cursor: (duration === '10s' || duration === '15s') ? 'not-allowed' : 'pointer',
+                backgroundColor: (duration === '10s' || duration === '15s') ? 'rgba(0, 0, 0, 0.05)' : 'var(--bg-input)'
+              }}
             >
               {PRESET_SCENES.map(s => (
                 <option key={s} value={s}>{s}</option>

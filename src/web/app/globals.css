@@ -517,6 +517,28 @@ input, textarea, select {
   background: rgba(245, 158, 11, 0.06);
 }
 
+.btn-draft {
+  background-color: var(--bg-input) !important;
+  border: 1px solid var(--border-default) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all var(--duration-fast) var(--ease-default) !important;
+}
+
+.btn-draft:hover {
+  border-color: var(--amber-500) !important;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+  color: var(--amber-500) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15) !important;
+}
+
+.btn-draft:active {
+  transform: translateY(0);
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -1290,19 +1312,7 @@ input, textarea, select {
   align-items: center;
 }
 
-.btn-draft {
-  border: 1px solid #eee !important;
-  background: #f9f9f9 !important;
-  transition: all var(--duration-fast) !important;
-}
 
-.btn-draft:hover {
-  background: #ffffff !important;
-  border-color: var(--amber-300) !important;
-  color: var(--amber-600) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(180, 130, 80, 0.05);
-}
 
 .scene-timeline {
   display: flex;

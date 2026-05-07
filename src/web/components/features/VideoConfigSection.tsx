@@ -89,8 +89,7 @@ export const VideoConfigSection = ({
     }
   }, [duration]);
 
-  const handleDurationOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const handleDurationSelect = (val: string) => {
     setSelectedDurOption(val);
     if (val !== 'custom') {
       setDuration(val as DurationType);
@@ -211,26 +210,62 @@ export const VideoConfigSection = ({
 
         <div className="form-row">
           {/* Aspect ratio */}
-          <div className="form-group" style={{ marginBottom:0 }}>
+          <div className="form-group" style={{ marginBottom:0, flex: 1 }}>
             <label className="form-label">Tỷ lệ khung hình</label>
             <select className="form-select" value={aspectRatio} onChange={e => setAspectRatio(e.target.value as AspectRatioType)}>
               <option value="9:16">9:16</option>
               <option value="16:9">16:9</option>
             </select>
           </div>
-          {/* Duration */}
-          <div className="form-group" style={{ marginBottom:0 }}>
-            <label className="form-label">Thời lượng</label>
-            <select 
-              className="form-select" 
-              value={selectedDurOption} 
-              onChange={handleDurationOptionChange}
+        </div>
+
+        {/* Duration Pills */}
+        <div className="form-group" style={{ marginTop: '12px', marginBottom: 0 }}>
+          <label className="form-label">THỜI LƯỢNG</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+            {PRESET_DURATIONS.map(d => {
+              const isSelected = selectedDurOption === d.value;
+              const shortLabel = d.label.replace(' giây', 's').replace(' phút', 'm');
+              return (
+                <div 
+                  key={d.value}
+                  onClick={() => handleDurationSelect(d.value)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '24px',
+                    border: isSelected ? '1px solid var(--amber-500)' : '1px solid var(--border-default)',
+                    backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-input)',
+                    color: isSelected ? 'var(--amber-500)' : 'var(--text-secondary)',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? 600 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    minWidth: '48px',
+                    textAlign: 'center'
+                  }}
+                >
+                  {shortLabel}
+                </div>
+              );
+            })}
+            <div 
+              onClick={() => handleDurationSelect('custom')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '24px',
+                border: selectedDurOption === 'custom' ? '1px solid var(--amber-500)' : '1px solid var(--border-default)',
+                backgroundColor: selectedDurOption === 'custom' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-input)',
+                color: selectedDurOption === 'custom' ? 'var(--amber-500)' : 'var(--text-secondary)',
+                fontSize: '13px',
+                fontWeight: selectedDurOption === 'custom' ? 600 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                minWidth: '48px',
+                textAlign: 'center'
+              }}
             >
-              {PRESET_DURATIONS.map(d => (
-                <option key={d.value} value={d.value}>{d.label}</option>
-              ))}
-              <option value="custom">Khác...</option>
-            </select>
+              Khác
+            </div>
           </div>
         </div>
 

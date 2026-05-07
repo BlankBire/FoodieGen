@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { AppHeader } from '../components/features/AppHeader'
 import { VideoConfigSection } from '../components/features/VideoConfigSection'
 import { ContentSection } from '../components/features/ContentSection'
 import { VisualAudioSection } from '../components/features/VisualAudioSection'
 import { PreviewPanel } from '../components/features/PreviewPanel'
 import { SettingsModal } from '../components/features/SettingsModal'
+import { DraftListPopover } from '../components/features/DraftListPopover'
 import { ResolutionType, AspectRatioType, DurationType, AIModelType } from '../types'
 import { TONES, CHARACTERS } from '../constants'
 import { AlertCircle } from 'lucide-react'
@@ -46,10 +47,10 @@ export default function Home() {
   const [locationContext,setLocationContext]= useState('Tại cửa hàng')
   const [mainCharacter,  setMainCharacter]  = useState('Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.')
   const [videoGenre,     setVideoGenre]     = useState('Giới thiệu món ăn')
-  const [numScenes,      setNumScenes]      = useState('2 cảnh')
+  const [numScenes,      setNumScenes]      = useState('1 cảnh')
 
   const [scriptId,       setScriptId]       = useState('')
-  const [projectId,      setProjectId]      = useState('123e4567-e89b-12d3-a456-426614174000')
+  const [projectId,      setProjectId]      = useState('')
   const [script,         setScript]         = useState('')
   const [videoUrl,       setVideoUrl]       = useState('')
   const [audioUrl,       setAudioUrl]       = useState('')
@@ -62,7 +63,28 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; hiding: boolean } | null>(null)
   const [isReadingMode, setIsReadingMode] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isDraftListOpen, setIsDraftListOpen] = useState(false)
+  const [draftCount, setDraftCount] = useState(0)
   const [runwayModelPref, setRunwayModelPref] = useState('gen4_turbo')
+  const isInitialMount = useRef(true)
+
+  const fetchDraftCount = async (retries = 4, delay = 1500): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/draft`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (data.success && data.data) {
+        setDraftCount(data.data.length)
+      }
+    } catch (err) {
+      console.warn('Failed to fetch draft count, retrying in background...', err)
+      if (retries > 0) {
+        setTimeout(() => {
+          fetchDraftCount(retries - 1, delay)
+        }, delay)
+      }
+    }
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -73,6 +95,7 @@ export default function Home() {
   }, [isReadingMode])
 
   useEffect(() => {
+    fetchDraftCount()
     setRunwayModelPref(localStorage.getItem('foodiegen_runway_model') || 'gen4_turbo')
     const saved = localStorage.getItem('foodiegen_draft')
     if (saved) {
@@ -104,6 +127,22 @@ export default function Home() {
       } catch (e) {}
     }
   }, [])
+
+  // Synchronize duration and number of scenes based on user request
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
+    if (duration === '10s') {
+      setNumScenes('1 cảnh')
+    } else if (duration === '15s') {
+      setNumScenes('2 cảnh')
+    } else {
+      setNumScenes('3 cảnh')
+    }
+  }, [duration])
 
   const showToast = (message: string) => {
     setToast({ message, hiding: false })
@@ -149,9 +188,39 @@ export default function Home() {
     setVideoScenes([])
     setProductImage(null)
     setStatus('')
+    setProjectId('')
+    setScriptId('')
     
     localStorage.removeItem('foodiegen_draft')
     showToast('Đã làm mới toàn bộ cài đặt.')
+  }
+
+  const handleLoadDraft = (d: any, pid: string, sid: string) => {
+    setProjectId(pid)
+    setScriptId(sid)
+    if (d.resolution) setResolution(d.resolution)
+    if (d.aspectRatio) setAspectRatio(d.aspectRatio)
+    if (d.duration) setDuration(d.duration)
+    if (d.model) setModel(d.model)
+    if (d.activeStyle) setActiveStyle(d.activeStyle)
+    if (d.activeTone) setActiveTone(d.activeTone)
+    if (d.emotion) setEmotion(d.emotion)
+    if (d.motionIntensity) setMotionIntensity(d.motionIntensity)
+    if (d.transitions !== undefined) setTransitions(d.transitions)
+    if (d.charConsistency !== undefined) setCharConsistency(d.charConsistency)
+    if (d.voiceGender) setVoiceGender(d.voiceGender)
+    if (d.language) setLanguage(d.language)
+    if (d.voiceSpeed) setVoiceSpeed(d.voiceSpeed)
+    if (d.voiceOver !== undefined) setVoiceOver(d.voiceOver)
+    if (d.bgMusic !== undefined) setBgMusic(d.bgMusic)
+    if (d.foodTopic) setFoodTopic(d.foodTopic)
+    if (d.characterType) setCharacterType(d.characterType)
+    if (d.locationContext) setLocationContext(d.locationContext)
+    if (d.mainCharacter) setMainCharacter(d.mainCharacter)
+    if (d.videoGenre) setVideoGenre(d.videoGenre)
+    if (d.script) setScript(d.script)
+    if (d.videoScenes) setVideoScenes(d.videoScenes)
+    if (d.productImage) setProductImage(d.productImage)
   }
 
   const handleDownload = async () => {
@@ -208,17 +277,16 @@ export default function Home() {
       setStatus('Đang lưu bản nháp...')
       
       const payload = {
-        name: foodTopic || 'Kịch bản chưa đặt tên',
-        projectId: projectId,
-        content: {
-          scenes: [], // Nếu có parser kịch bản thì đưa vào đây
-          config: {
-            resolution, aspectRatio, duration, model, activeStyle, activeTone,
-            emotion, motionIntensity, transitions, charConsistency,
-            voiceGender, language, voiceSpeed, voiceOver, bgMusic,
-            characterId, characterType, locationContext, mainCharacter, numScenes, 
-            script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
-          }
+        projectId: projectId || undefined,
+        scriptId: scriptId || undefined,
+        topic: foodTopic || 'Kịch bản chưa đặt tên',
+        scenes: videoScenes || [],
+        config: {
+          resolution, aspectRatio, duration, model, activeStyle, activeTone,
+          emotion, motionIntensity, transitions, charConsistency,
+          voiceGender, language, voiceSpeed, voiceOver, bgMusic,
+          characterId, characterType, locationContext, mainCharacter, numScenes, 
+          script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
         }
       }
 
@@ -230,7 +298,8 @@ export default function Home() {
       const data = await res.json()
       
       if (data.success) {
-        setScriptId(data.id)
+        setProjectId(data.projectId)
+        setScriptId(data.scriptId)
         localStorage.setItem('foodiegen_draft', JSON.stringify({
           resolution, aspectRatio, duration, model, activeStyle, activeTone,
           emotion, motionIntensity, transitions, charConsistency,
@@ -238,6 +307,7 @@ export default function Home() {
           foodTopic, characterType, locationContext, mainCharacter, videoGenre,
           script, videoScenes, productImage
         }))
+        fetchDraftCount()
         showToast('Đã lưu kịch bản vào bộ nhớ tạm thời.')
         setStatus('Đã lưu nháp.')
       } else {
@@ -311,6 +381,7 @@ export default function Home() {
         setScript(displayParts.join('\n\n'))
         if (data.scenes) setRawScenes(data.scenes)
         if (data.scriptId) setScriptId(data.scriptId)
+        if (data.projectId) setProjectId(data.projectId)
         showToast('Tạo kịch bản thành công!')
         setStatus('Kịch bản đã sẵn sàng.')
       }
@@ -489,6 +560,7 @@ export default function Home() {
 
           
           <ContentSection 
+            duration={duration}
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
             mainCharacter={mainCharacter} setMainCharacter={setMainCharacter}
             characterId={characterId} setCharacterId={setCharacterId}
@@ -521,16 +593,41 @@ export default function Home() {
           />
 
           {/* Main Action Buttons — Compact & Clean */}
-          <div className="main-actions-container">
+          <div className="main-actions-container" style={{ position: 'relative' }}>
             {status && <p style={{ marginRight: 'auto', color: '#6366f1', fontSize: '0.9rem' }}>{status}</p>}
-            <button 
-              className="btn-secondary btn-draft" 
-              onClick={handleSaveDraft}
-              disabled={loading}
-              style={{ padding: '12px 24px', minWidth: 120 }}
-            >
-              {loading && status === 'Đang lưu bản nháp...' ? 'Đang lưu...' : 'Lưu nháp'}
-            </button>
+            
+            <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+              <button 
+                className="btn-secondary btn-draft" 
+                onClick={handleSaveDraft}
+                disabled={loading}
+                style={{ padding: '12px 24px', minWidth: 100 }}
+              >
+                {loading && status === 'Đang lưu bản nháp...' ? 'Đang lưu...' : 'Lưu nháp'}
+              </button>
+              
+              <button 
+                className="btn-secondary btn-draft" 
+                onClick={() => setIsDraftListOpen(!isDraftListOpen)}
+                style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                Danh sách nháp <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--text-accent)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>{draftCount}</span>
+              </button>
+
+              {isDraftListOpen && (
+                <DraftListPopover 
+                  currentProjectId={projectId}
+                  onLoadDraft={handleLoadDraft}
+                  onClose={() => {
+                    setIsDraftListOpen(false)
+                    fetchDraftCount()
+                  }}
+                  onDraftsUpdated={fetchDraftCount}
+                  showToast={showToast}
+                />
+              )}
+            </div>
+
             <button 
               className="btn-generate" 
               onClick={handleGenerateVideo}
