@@ -70,3 +70,8 @@ api-server.log
 # Temporary scratch files
 tmp_*.js
 tmp/
+
+# Claude Context Files
+.claude/
+.claudeignore
+CLAUDE.md

@@ -249,11 +249,77 @@ QUY TẮC VỀ ĐỘ DÀI:
 `;
     }
 
+    // === GENRE-SPECIFIC DIALOGUE GUIDE ===
+    function buildGenrePrompt(genre: string): string {
+      if (!genre) return '';
+      const g = genre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+
+      const knownGenres: Record<string, string> = {
+        'khuyen mai': `
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI — KHUYẾN MÃI (PROMOTION):
+- Mục tiêu lời thoại: Tạo CẢM GIÁC KHẨN CẤP và kích thích MUA NGAY.
+- HOOK phải đánh thẳng vào ưu đãi: "Đừng bỏ lỡ!", "Chỉ trong hôm nay thôi!", "Cơ hội cuối cùng!".
+- Thân bài PHẢI đề cập đến: mức giảm giá (%), combo ưu đãi, quà tặng kèm, hoặc thời hạn giới hạn.
+- CTA cực mạnh và cụ thể: "Đặt ngay trước [thời điểm] để nhận ưu đãi!", "Gọi ngay hotline / inbox ngay để chốt đơn!".
+- Giọng điệu: Hào hứng, khẩn trương, năng lượng cao. Tránh lời thoại nhẹ nhàng hoặc kể chuyện chậm rãi.
+- Từ khóa nên dùng: "ưu đãi", "giảm giá", "miễn phí", "combo", "hôm nay", "giới hạn", "đặt ngay", "chỉ còn".`,
+
+        'gioi thieu mon an': `
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI — GIỚI THIỆU MÓN ĂN:
+- Mục tiêu lời thoại: Kích thích VỊ GIÁC và khao khát được thưởng thức.
+- HOOK: Gợi hình ảnh hoặc cảm giác ngon — "Bạn có nghe thấy tiếng xèo xèo không?", "Mùi thơm này đã khiến cả phố phải dừng lại".
+- Thân bài: Mô tả chi tiết hương vị (ngọt, cay, béo, giòn), nguyên liệu đặc biệt, cách chế biến bí truyền.
+- CTA: Mời khám phá nhẹ nhàng — "Ghé thử một lần để cảm nhận!", "Bạn chỉ cần thử một miếng thôi là hiểu ngay".
+- Giọng điệu: Ấm áp, gợi cảm, đủng đỉnh. Không vội vàng. Không chứa từ "khuyến mãi" hay "giảm giá".`,
+
+        'review nha hang': `
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI — REVIEW NHÀ HÀNG:
+- Mục tiêu lời thoại: Chia sẻ TRẢI NGHIỆM THỰC TẾ, xây dựng tin tưởng.
+- HOOK: Góc nhìn cá nhân — "Tôi đã thử hơn 20 quán, và đây là lần đầu tôi ăn hết sạch đĩa".
+- Thân bài: Nêu điểm mạnh cụ thể (phục vụ, không gian, giá, hương vị), có thể đề cập 1-2 điểm cải thiện nhỏ để tăng độ tin cậy.
+- CTA: Gợi ý thực tế — "Nếu bạn đang tìm chỗ ăn cuối tuần, đây là lựa chọn của tôi".
+- Giọng điệu: Chân thực, cởi mở, như người bạn tư vấn. Không quảng cáo quá lố.`,
+
+        'cong thuc nau an': `
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI — CÔNG THỨC NẤU ĂN:
+- Mục tiêu lời thoại: Hướng dẫn CỤ THỂ, truyền cảm hứng tự nấu tại nhà.
+- HOOK: Thách thức hoặc hứa hẹn — "5 phút là xong món này!", "Bí quyết mà nhà hàng không muốn bạn biết".
+- Thân bài: Liệt kê nguyên liệu chính, các bước quan trọng (ngắn gọn), mẹo nhỏ để thành công.
+- CTA: Khuyến khích thực hành — "Thử ngay tối nay và tag tôi kết quả nhé!", "Lưu lại công thức này trước khi quên!".
+- Giọng điệu: Rõ ràng, bước-theo-bước, thân thiện như người dạy nấu ăn. Không dùng ngôn ngữ bán hàng.`,
+
+        'storytelling': `
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI — STORYTELLING (KỂ CHUYỆN):
+- Mục tiêu lời thoại: Chạm vào CẢM XÚC, tạo kết nối với thương hiệu/món ăn.
+- HOOK: Câu chuyện hoặc ký ức — "Mỗi mùa thu về, bà lại tự tay làm...", "Có một hương vị tôi không bao giờ quên được".
+- Thân bài: Kể câu chuyện phía sau món ăn — nguồn gốc, người làm ra nó, kỷ niệm gắn liền.
+- CTA: Kêu gọi cảm xúc — "Hãy để món ăn này trở thành ký ức của bạn nữa".
+- Giọng điệu: Chậm rãi, thơ mộng, giàu hình ảnh. Tránh ngôn ngữ thương mại trực tiếp.`,
+      };
+
+      // Normalize và tìm match
+      const normalizedG = g.replace(/[^a-z0-9 ]/g, '').trim();
+      for (const [key, guide] of Object.entries(knownGenres)) {
+        if (normalizedG.includes(key) || key.includes(normalizedG)) {
+          return `\nTHỂ LOẠI VIDEO: ${genre}.${guide}`;
+        }
+      }
+
+      // Fallback cho thể loại tùy chỉnh
+      return `
+THỂ LOẠI VIDEO TÙY CHỈNH: "${genre}".
+QUY TẮC LỜI THOẠI THEO THỂ LOẠI:
+- Phân tích tên thể loại "${genre}" và xác định MỤC ĐÍCH CHÍNH của loại video này (giải trí, bán hàng, giáo dục, truyền cảm hứng...).
+- HOOK, thân bài, và CTA phải được thiết kế PHÙ HỢP với mục đích đó.
+- Giọng điệu, từ vựng, và nhịp điệu lời thoại phải NHẤT QUÁN với đặc trưng của thể loại "${genre}".
+- Tuyệt đối không viết lời thoại theo mẫu chung chung — phải thể hiện rõ DNA của thể loại này.`;
+    }
+
     // Inject custom genre, emotion, style, and tone into prompt
-    const genreNote = videoGenre ? `\nTHỂ LOẠI VIDEO: ${videoGenre}. Kịch bản phải phù hợp với thể loại này.` : '';
+    const genreNote = buildGenrePrompt(videoGenre);
     const emotionNote = emotion ? `\nCẢM XÚC CHỦ ĐẠO: ${emotion}. Toàn bộ kịch bản phải toát lên cảm xúc "${emotion}" — từ lời thoại, mô tả hình ảnh đến nhịp điệu kể chuyện.` : '';
     const styleNote = activeStyle ? `\nPHONG CÁCH HÌNH ẢNH: ${activeStyle}. Mô tả hình ảnh trong mỗi phân cảnh phải mang phong cách "${activeStyle}".` : '';
-    const toneNote = tone ? `\nTONE NỘI DUNG: ${tone}. Giọng điệu của kịch bản (kể cả giọng lồng tiếng) phải đúng chất "${tone}".` : '';
+    const toneNote = tone ? `\nTONE NỘI DUNG: ${tone}. Giọng điệu của kịch bản (kể cả giọng lồng tiếng) phải đúng chất "${tone}". Các từ ngữ, nhịp câu và cảm xúc trong fullAudioScript phải phản ánh tone "${tone}" xuyên suốt.` : '';
     basePrompt += genreNote + emotionNote + styleNote + toneNote;
 
     basePrompt += `

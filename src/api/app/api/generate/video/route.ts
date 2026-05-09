@@ -7,7 +7,36 @@ import fs from 'fs';
 import path from 'path';
 import { CHARACTERS, VOICES } from '../../../../lib/constants';
 
-/** 
+function emotionToVisual(emotion: string): string {
+  const map: Record<string, string> = {
+    'Vui tươi': 'Bright warm lighting, vivid saturated colors, upbeat fast cuts, smiling expressions.',
+    'Sang trọng': 'Dark rich tones, dramatic side lighting, slow elegant camera moves, premium textures.',
+    'Ấm cúng': 'Golden hour warm tones, soft diffused light, gentle slow motion, cozy intimate framing.',
+    'Phấn khích': 'High energy motion, dynamic handheld camera, bold colors, fast-paced energetic cuts.',
+    'Bình yên': 'Soft pastel palette, gentle bokeh, slow drift camera, serene natural light.',
+    'Mãnh liệt': 'Contrast-heavy lighting, deep shadows, intense close-ups, dramatic rimlight.',
+    'Bí ẩn': 'Low-key lighting, cool dark tones, shallow depth of field, mysterious atmosphere.',
+    'Tươi mới': 'Clean bright whites, natural daylight, crisp sharp focus, airy open framing.',
+  };
+  return map[emotion] || `Evoke a sense of ${emotion} through lighting, color grading, and pacing.`;
+}
+
+function toneToVisual(tone: string): string {
+  const map: Record<string, string> = {
+    'Kích thích': 'Fast dynamic transitions, bold on-screen energy, urgent pacing.',
+    'Sang trọng': 'Slow deliberate pacing, minimal motion, refined elegant composition.',
+    'Cảm xúc': 'Soft focus emotional close-ups, lingering shots, gentle movement.',
+    'Bán hàng': 'Product prominently centered, clear bright presentation, confident direct framing.',
+    'Viral': 'Unexpected angle, eye-catching moment in first 2 seconds, punchy quick cuts.',
+    'Review': 'Steady medium shots, natural authentic lighting, documentary-style framing.',
+    'Giáo dục': 'Clear well-lit step-by-step framing, close-up detail shots, organized composition.',
+    'Kể chuyện': 'Cinematic wide establishing shots, smooth narrative transitions, atmospheric depth.',
+    'Hài hước': 'Playful unconventional angles, exaggerated reactions, bouncy light movement.',
+  };
+  return map[tone] || `Visual presentation should reflect a ${tone} tone throughout.`;
+}
+
+/**
  * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
  * Chuyển sang v1 để tránh lỗi 404 v1beta.
  */
@@ -722,8 +751,8 @@ export async function POST(req: Request) {
             // [4] KỸ THUẬT & PHONG CÁCH
             `CINEMATOGRAPHY: ${config?.style || config?.activeStyle || 'cinematic'} style. Professional 4K lighting. ${motionKeyword}.`,
             consistencyContext,
-            config?.emotion ? `MOOD: ${config.emotion}.` : '',
-            config?.tone ? `TONE: ${config.tone}.` : '',
+            config?.emotion ? `MOOD & ATMOSPHERE: ${config.emotion}. ${emotionToVisual(config.emotion)}` : '',
+            config?.tone ? `CONTENT TONE: ${config.tone}. ${toneToVisual(config.tone)}` : '',
             config?.transitions === false ? `Continuous single shot, no cuts.` : '',
             config?.charConsistency ? `CONSISTENCY: Maintain exact character appearance across all frames.` : ''
         ].filter(Boolean).join(' ');
