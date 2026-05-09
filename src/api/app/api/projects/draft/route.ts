@@ -10,12 +10,18 @@ export async function POST(req: Request) {
     // Dùng userId mặc định cho hệ thống chưa có Auth
     const defaultUserId = "123e4567-e89b-12d3-a456-426614174000";
 
-    // 1. Tìm hoặc Tạo Project
+    // 1. Tìm hoặc Tạo Project — dùng upsert để xử lý projectId lỗi thời (đã bị xóa)
     let project;
     if (projectId) {
-      project = await prisma.videoProject.update({
+      project = await prisma.videoProject.upsert({
         where: { id: projectId },
-        data: {
+        update: {
+          storyTopic: topic,
+          status: "draft",
+        },
+        create: {
+          userId: defaultUserId,
+          title: topic || "Bản nháp không tiêu đề",
           storyTopic: topic,
           status: "draft",
         },
@@ -31,7 +37,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Lưu nội dung vào VideoScript (Bao gồm kịch bản và cấu hình UI)
+    // 2. Lưu nội dung vào VideoScript — dùng upsert để xử lý scriptId lỗi thời
     const contentPayload = {
       scenes: scenes || [],
       config: config || {},
@@ -39,10 +45,15 @@ export async function POST(req: Request) {
 
     let script;
     if (scriptId) {
-      script = await prisma.videoScript.update({
+      script = await prisma.videoScript.upsert({
         where: { id: scriptId },
-        data: {
+        update: {
           content: JSON.stringify(contentPayload),
+        },
+        create: {
+          projectId: project.id,
+          content: JSON.stringify(contentPayload),
+          isActive: true,
         },
       });
     } else {

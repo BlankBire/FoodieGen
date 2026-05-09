@@ -9,9 +9,10 @@ export interface DraftListPopoverProps {
   onClose: () => void;
   showToast: (msg: string) => void;
   onDraftsUpdated?: () => void;
+  onDeleteDraft?: (deletedProjectId: string) => void;
 }
 
-export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showToast, onDraftsUpdated }: DraftListPopoverProps) => {
+export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showToast, onDraftsUpdated, onDeleteDraft }: DraftListPopoverProps) => {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,9 +50,8 @@ export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showT
       if (data.success) {
         showToast('Đã xóa bản nháp');
         setDrafts(prev => prev.filter(d => d.id !== id));
-        if (onDraftsUpdated) {
-          onDraftsUpdated();
-        }
+        if (onDraftsUpdated) onDraftsUpdated();
+        if (onDeleteDraft) onDeleteDraft(id);
       } else {
         throw new Error(data.error);
       }

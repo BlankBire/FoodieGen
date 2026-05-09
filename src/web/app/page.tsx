@@ -615,7 +615,7 @@ export default function Home() {
               </button>
 
               {isDraftListOpen && (
-                <DraftListPopover 
+                <DraftListPopover
                   currentProjectId={projectId}
                   onLoadDraft={handleLoadDraft}
                   onClose={() => {
@@ -624,6 +624,12 @@ export default function Home() {
                   }}
                   onDraftsUpdated={fetchDraftCount}
                   showToast={showToast}
+                  onDeleteDraft={(deletedId) => {
+                    if (deletedId === projectId) {
+                      setProjectId('')
+                      setScriptId('')
+                    }
+                  }}
                 />
               )}
             </div>
