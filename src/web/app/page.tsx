@@ -67,6 +67,7 @@ export default function Home() {
   const [draftCount, setDraftCount] = useState(0)
   const [runwayModelPref, setRunwayModelPref] = useState('gen4_turbo')
   const isInitialMount = useRef(true)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchDraftCount = async (retries = 4, delay = 1500): Promise<void> => {
     try {
@@ -145,8 +146,9 @@ export default function Home() {
   }, [duration])
 
   const showToast = (message: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setToast({ message, hiding: false })
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast(prev => prev ? { ...prev, hiding: true } : null)
       setTimeout(() => setToast(null), 500)
     }, 8000)

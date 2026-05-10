@@ -17,6 +17,7 @@ export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showT
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchDrafts = async () => {
     try {
@@ -38,14 +39,17 @@ export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showT
     fetchDrafts();
   }, []);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bản nháp này?')) return;
-    
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/draft?projectId=${id}`, {
-        method: 'DELETE'
-      });
+      const res = await fetch(`${API_BASE}/api/projects/draft?projectId=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         showToast('Đã xóa bản nháp');
@@ -273,6 +277,68 @@ export const DraftListPopover = ({ currentProjectId, onLoadDraft, onClose, showT
           </div>
         )}
       </div>
+
+      {confirmDeleteId && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+          }}
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-glass)',
+              backdropFilter: 'blur(25px)',
+              WebkitBackdropFilter: 'blur(25px)',
+              border: '1px solid var(--border-accent)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-card)',
+              padding: '32px 28px 24px',
+              width: 460,
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+            }}>
+              <Trash2 size={22} color="#ef4444" />
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+              Xóa bản nháp?
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 24px', textAlign: 'center', lineHeight: 1.6 }}>
+              Hành động này không thể hoàn tác.
+            </p>
+            <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                style={{
+                  flex: 1, padding: '10px 0', fontSize: 14, fontWeight: 500,
+                  background: 'var(--bg-input)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-default)', borderRadius: 10, cursor: 'pointer',
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: 1, padding: '10px 0', fontSize: 14, fontWeight: 600,
+                  background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                  border: '1px solid rgba(239,68,68,0.35)', borderRadius: 10, cursor: 'pointer',
+                }}
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
