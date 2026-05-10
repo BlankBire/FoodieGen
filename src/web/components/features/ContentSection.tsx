@@ -29,6 +29,7 @@ interface ContentSectionProps {
   setVoiceGender: (v: string) => void;
   model: AIModelType;
   videoScenes?: any[];
+  isScriptDisabled?: boolean;
 }
 
 const PRESET_LOCATIONS = [
@@ -72,7 +73,8 @@ export const ContentSection = ({
   loading,
   setVoiceGender,
   model,
-  videoScenes = []
+  videoScenes = [],
+  isScriptDisabled = false
 }: ContentSectionProps) => {
   // Location custom state
   const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
@@ -400,11 +402,12 @@ export const ContentSection = ({
                   Chế độ đọc
                 </button>
                 {!isManualMode && (
-                  <button 
-                    className="btn-primary" 
+                  <button
+                    className="btn-primary"
                     onClick={onGenerateScript}
-                    disabled={loading}
-                    style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
+                    disabled={loading || isScriptDisabled}
+                    title={isScriptDisabled ? 'Gen-4 Turbo cần ảnh sản phẩm trước khi tạo kịch bản' : undefined}
+                    style={{ padding:'8px 16px', fontSize:13, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', opacity: isScriptDisabled ? 0.5 : 1 }}
                   >
                     {loading ? 'Đang tạo...' : 'AI tạo kịch bản'}
                   </button>

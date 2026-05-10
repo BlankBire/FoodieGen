@@ -329,6 +329,9 @@ export default function Home() {
 
   const handleGenerateScript = async () => {
     if (!foodTopic.trim()) return showToast('Vui lòng nhập món ăn/chủ đề.')
+    if (model === 'runway_ai' && runwayModelPref === 'gen4_turbo' && !productImage) {
+      return showToast('Gen-4 Turbo cần ảnh sản phẩm để Gemini đọc và tạo kịch bản chính xác. Vui lòng tải ảnh lên trước.')
+    }
     
     try {
       setLoading(true)
@@ -420,6 +423,9 @@ export default function Home() {
 
   const handleGenerateVideo = async () => {
     if (!script.trim()) return showToast('Vui lòng tạo hoặc nhập kịch bản trước.')
+    if ((model === 'runway_ai' || model === 'runway_manual') && runwayModelPref === 'gen4_turbo' && !productImage) {
+      return showToast('Gen-4 Turbo là mô hình Image-to-Video, cần có ảnh sản phẩm để tạo video. Vui lòng tải ảnh lên.')
+    }
     
     try {
       setLoading(true)
@@ -559,7 +565,7 @@ export default function Home() {
           />
 
           
-          <ContentSection 
+          <ContentSection
             duration={duration}
             foodTopic={foodTopic} setFoodTopic={setFoodTopic}
             mainCharacter={mainCharacter} setMainCharacter={setMainCharacter}
@@ -577,6 +583,7 @@ export default function Home() {
             loading={loading}
             setVoiceGender={setVoiceGender}
             model={model}
+            isScriptDisabled={model === 'runway_ai' && runwayModelPref === 'gen4_turbo' && !productImage}
           />
 
           <VisualAudioSection 
@@ -634,11 +641,11 @@ export default function Home() {
               )}
             </div>
 
-            <button 
-              className="btn-generate" 
+            <button
+              className="btn-generate"
               onClick={handleGenerateVideo}
-              disabled={loading || !script.trim()}
-              style={{ width: 'auto', padding: '12px 32px', minWidth: 180, opacity: (loading || !script.trim()) ? 0.7 : 1 }}
+              disabled={loading || !script.trim() || ((model === 'runway_ai' || model === 'runway_manual') && runwayModelPref === 'gen4_turbo' && !productImage)}
+              style={{ width: 'auto', padding: '12px 32px', minWidth: 180, opacity: (loading || !script.trim() || ((model === 'runway_ai' || model === 'runway_manual') && runwayModelPref === 'gen4_turbo' && !productImage)) ? 0.7 : 1 }}
             >
               <span>{loading ? 'Đang tạo...' : 'Tạo video'}</span>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

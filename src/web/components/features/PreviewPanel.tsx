@@ -111,9 +111,19 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
 
         {/* Product Image Upload */}
         <div className="glass-card" style={{ padding: 'var(--space-5)' }}>
-          <h3 className="form-label" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase' }}>
-            Hình ảnh sản phẩm mẫu
-          </h3>
+          {(() => {
+            const isGen4Turbo = (config.model === 'runway_ai' || config.model === 'runway_manual') && config.runwayModel === 'gen4_turbo';
+            return (
+              <h3 className="form-label" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)', fontSize: 13, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Hình ảnh sản phẩm mẫu
+                {isGen4Turbo && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: productImage ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)', color: productImage ? '#16a34a' : '#dc2626', border: `1px solid ${productImage ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.25)'}`, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                    {productImage ? 'Đã có ảnh' : 'Bắt buộc'}
+                  </span>
+                )}
+              </h3>
+            );
+          })()}
           
           <div 
             onClick={() => fileInputRef.current?.click()}
@@ -164,13 +174,18 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
               </div>
             )}
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleImageUpload} 
-            accept="image/*" 
-            style={{ display: 'none' }} 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+            accept="image/*"
+            style={{ display: 'none' }}
           />
+          {(config.model === 'runway_ai' || config.model === 'runway_manual') && config.runwayModel === 'gen4_turbo' && !productImage && (
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', lineHeight: 1.5 }}>
+              Gen-4 Turbo chỉ hỗ trợ Image-to-Video. Tải ảnh lên để Gemini đọc thông tin thương hiệu và tạo kịch bản chính xác.
+            </p>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>

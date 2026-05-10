@@ -250,12 +250,11 @@ async function generateVideoTask(
   promptImage?: string,
   preferredModel?: string
 ) {
-  // Ưu tiên model do người dùng chọn từ giao diện (gen4_turbo hoặc gen4.5)
-  // Lưu ý: gen4_turbo CHỈ hỗ trợ Image-to-Video. Nếu user chọn gen4_turbo nhưng không up ảnh, bắt buộc fallback về gen4.5
-  let model = preferredModel || 'gen4.5';
+  const model = preferredModel || 'gen4.5';
   if (model === 'gen4_turbo' && !promptImage) {
-    console.log('[RUNWAY] Fallback to gen4.5 because gen4_turbo requires an image.');
-    model = 'gen4.5';
+    const err = new Error('[Runway] gen4_turbo requires a product image (I2V only). Upload an image before generating.');
+    (err as any).apiSource = 'runway';
+    throw err;
   }
 
   let res: { id: string } | null = null;
@@ -733,29 +732,44 @@ export async function POST(req: Request) {
             ? `CONTINUITY: This is segment ${i+1} of a long sequence. Maintain exact same ${mainCharacter} appearance, clothing, and the ${locationContext} background from the previous clip. No jumping locations.` 
             : "START SCENE: High fidelity macro focus on food, then reveal character.";
 
-        // === VISUAL PROMPT - Thiết kế theo từng lớp để AI không bỏ qua nhân vật/bối cảnh ===
-        // Quan trọng: ảnh mẫu CHỈ có đồ ăn, mọi thông tin khác đều từ kịch bản
-        // → Phải đặt Character + Location TRƯỚC, rồi mới nói đến Product
-        const visualPrompt = [
-            // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render (Sử dụng tiếng Anh)
-            `SCENE: A ${c.duration}-second cinematic food marketing video.`,
-            `MAIN CHARACTER (REQUIRED): ${englishCharacterDesc}.`,
-            `CHARACTER ACTION: The character is actively ${combinedDesc.slice(0, 200)}.`,
-            `CHARACTER BEHAVIOR: Visible natural facial expressions, mouth moving naturally while speaking, direct eye contact with camera.`,
-            // [2] BỐI CẢNH - Phải rõ ràng để AI tạo đúng location
-            `LOCATION & BACKGROUND (REQUIRED): ${locationContext}. The setting must be clearly established with appropriate props, lighting, and environmental details.`,
-            // [3] SẢN PHẨM - Tham chiếu ảnh mẫu nhưng là phần phụ trợ
-            productImage
-              ? `PRODUCT (use reference image as anchor): The food/product from the reference image is prominently featured. Maintain 100% geometric fidelity to the source image — no morphing, no shape changes.`
-              : `PRODUCT: ${combinedDesc.slice(200, 400)}. Photorealistic, appetizing presentation.`,
-            // [4] KỸ THUẬT & PHONG CÁCH
-            `CINEMATOGRAPHY: ${config?.style || config?.activeStyle || 'cinematic'} style. Professional 4K lighting. ${motionKeyword}.`,
-            consistencyContext,
-            config?.emotion ? `MOOD & ATMOSPHERE: ${config.emotion}. ${emotionToVisual(config.emotion)}` : '',
-            config?.tone ? `CONTENT TONE: ${config.tone}. ${toneToVisual(config.tone)}` : '',
-            config?.transitions === false ? `Continuous single shot, no cuts.` : '',
-            config?.charConsistency ? `CONSISTENCY: Maintain exact character appearance across all frames.` : ''
-        ].filter(Boolean).join(' ');
+        // === VISUAL PROMPT ===
+        // Gen-4 Turbo I2V: image adherence rất mạnh → dùng interaction-based prompt
+        // để buộc model spawn nhân vật vào không gian chứa ảnh đồ ăn (spatial relationship).
+        // Gen-4.5 và các model khác: labeled sections để AI không bỏ qua nhân vật/bối cảnh.
+        const isGen4Turbo = selectedModel === 'runway' && config?.runwayModel === 'gen4_turbo' && !!productImage;
+
+        const visualPrompt = isGen4Turbo
+            ? [
+                // Nhân vật + tương tác với đồ ăn trong ảnh → model phải tính spatial relationship
+                `${englishCharacterDesc} seated before the dish from the reference image,`,
+                `${combinedDesc.slice(0, 150)},`,
+                `making natural eye contact with camera.`,
+                `Setting: ${locationContext}.`,
+                `${config?.style || config?.activeStyle || 'Cinematic'} style, professional 4K lighting. ${motionKeyword}.`,
+                config?.emotion ? emotionToVisual(config.emotion) : '',
+                config?.tone ? toneToVisual(config.tone) : '',
+                i > 0 ? `Same character appearance and setting as previous clip.` : `Reveal shot from food close-up to character with dish.`
+              ].filter(Boolean).join(' ')
+            : [
+                // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render (Sử dụng tiếng Anh)
+                `SCENE: A ${c.duration}-second cinematic food marketing video.`,
+                `MAIN CHARACTER (REQUIRED): ${englishCharacterDesc}.`,
+                `CHARACTER ACTION: The character is actively ${combinedDesc.slice(0, 200)}.`,
+                `CHARACTER BEHAVIOR: Visible natural facial expressions, mouth moving naturally while speaking, direct eye contact with camera.`,
+                // [2] BỐI CẢNH - Phải rõ ràng để AI tạo đúng location
+                `LOCATION & BACKGROUND (REQUIRED): ${locationContext}. The setting must be clearly established with appropriate props, lighting, and environmental details.`,
+                // [3] SẢN PHẨM - Tham chiếu ảnh mẫu nhưng là phần phụ trợ
+                productImage
+                  ? `PRODUCT (use reference image as anchor): The food/product from the reference image is prominently featured. Maintain 100% geometric fidelity to the source image — no morphing, no shape changes.`
+                  : `PRODUCT: ${combinedDesc.slice(200, 400)}. Photorealistic, appetizing presentation.`,
+                // [4] KỸ THUẬT & PHONG CÁCH
+                `CINEMATOGRAPHY: ${config?.style || config?.activeStyle || 'cinematic'} style. Professional 4K lighting. ${motionKeyword}.`,
+                consistencyContext,
+                config?.emotion ? `MOOD & ATMOSPHERE: ${config.emotion}. ${emotionToVisual(config.emotion)}` : '',
+                config?.tone ? `CONTENT TONE: ${config.tone}. ${toneToVisual(config.tone)}` : '',
+                config?.transitions === false ? `Continuous single shot, no cuts.` : '',
+                config?.charConsistency ? `CONSISTENCY: Maintain exact character appearance across all frames.` : ''
+              ].filter(Boolean).join(' ');
 
         // Runway API: giới hạn cứng 1000 ký tự cho promptText
         // Veo / Kling: không có giới hạn này → cho phép tới 1500 ký tự
