@@ -493,7 +493,13 @@ export default function Home() {
           sceneOrder: 1
         }])
         
-        showToast('HOÀN TẤT! Video đã sẵn sàng trên màn hình Preview.')
+        const requested = dataVideo.requestedDuration
+        const actual = dataVideo.actualDuration
+        if (requested && actual && actual !== requested) {
+          showToast(`Video hoàn tất! Lưu ý: thời lượng thực tế là ${actual}s (yêu cầu ${requested}s) do giới hạn của model ${model.includes('veo') ? 'Veo 3' : model.includes('kling') ? 'Kling' : 'Runway'}.`)
+        } else {
+          showToast('HOÀN TẤT! Video đã sẵn sàng trên màn hình Preview.')
+        }
         setStatus('Đồ ăn đã sẵn sàng phục vụ!')
       } else {
         const msg = dataVideo.partial ? (dataVideo.message || 'Đã tạo một phần.') : 'Có lỗi xảy ra khi tạo video.'

@@ -363,9 +363,8 @@ async function generateKlingVideoTask(
   };
 
   if (promptImage) {
-    // Kling mong muốn URL ảnh hoặc base64 tùy phiên bản, 
-    // ở đây giả định là URL đã được xử lý từ frontend
-    body.image = promptImage;
+    // Kling nhận pure base64, không nhận data URL prefix (data:image/...;base64,)
+    body.image = promptImage.includes('base64,') ? promptImage.split('base64,')[1] : promptImage;
   }
 
   console.log(`[KLING] [TASK] Model: ${body.model} | I2V: ${!!promptImage} | Request Sent...`);
@@ -671,22 +670,30 @@ export async function POST(req: Request) {
       totalSeconds = parseInt(durationStr) || 10;
     }
 
-    const maxClipDur = selectedModel === 'veo' ? 8 : 10;
+    const maxClipDur = selectedModel === 'veo' ? 8 : selectedModel === 'kling' ? 5 : 10;
     const numClips = Math.ceil(totalSeconds / maxClipDur);
     const clipsConfig = [];
-    
+
     for (let i = 0; i < numClips; i++) {
         let clipDur = maxClipDur;
         if (i === numClips - 1) {
             const remaining = totalSeconds % maxClipDur;
             clipDur = remaining === 0 ? maxClipDur : remaining;
-            // Runway/Kling only support 5 or 10. Round up.
-            if (selectedModel !== 'veo') {
+            if (selectedModel === 'runway') {
+                // Runway chỉ nhận 5 hoặc 10
                 clipDur = clipDur <= 5 ? 5 : 10;
+            } else if (selectedModel === 'kling') {
+                // Kling v3 chỉ nhận 5s
+                clipDur = 5;
+            } else if (selectedModel === 'veo') {
+                // Veo minimum ~5s — clip quá ngắn sẽ bị reject, round lên 5s
+                if (clipDur < 5) clipDur = 5;
             }
         }
         clipsConfig.push({ index: i, duration: clipDur });
     }
+
+    const actualTotalSeconds = clipsConfig.reduce((sum, c) => sum + c.duration, 0);
 
     const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
     const motionIntensity = Number(config?.motionIntensity ?? 50);
@@ -914,7 +921,7 @@ export async function POST(req: Request) {
           },
         });
         await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'completed' } });
-        return NextResponse.json({ success: true, results: [dbScene] });
+        return NextResponse.json({ success: true, results: [dbScene], requestedDuration: totalSeconds, actualDuration: actualTotalSeconds });
 
     } catch (pipelineErr: any) {
         console.error('[PIPELINE-ERROR]', pipelineErr);
