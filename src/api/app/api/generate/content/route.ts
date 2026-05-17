@@ -3,8 +3,38 @@ import { NextResponse } from "next/server";
 console.log("[TRACE] Loaded route: /api/generate/content");
 import prisma from "../../../../lib/prisma";
 import { GoogleGenAI } from "@google/genai";
+import { CHARACTERS } from "../../../../lib/constants";
 import fs from "fs";
 import path from "path";
+
+function emotionToVisual(emotion: string): string {
+  const map: Record<string, string> = {
+    'Vui tươi': 'Bright warm lighting, vivid saturated colors, upbeat fast cuts, smiling expressions.',
+    'Sang trọng': 'Dark rich tones, dramatic side lighting, slow elegant camera moves, premium textures.',
+    'Ấm cúng': 'Golden hour warm tones, soft diffused light, gentle slow motion, cozy intimate framing.',
+    'Phấn khích': 'High energy motion, dynamic handheld camera, bold colors, fast-paced energetic cuts.',
+    'Bình yên': 'Soft pastel palette, gentle bokeh, slow drift camera, serene natural light.',
+    'Mãnh liệt': 'Contrast-heavy lighting, deep shadows, intense close-ups, dramatic rimlight.',
+    'Bí ẩn': 'Low-key lighting, cool dark tones, shallow depth of field, mysterious atmosphere.',
+    'Tươi mới': 'Clean bright whites, natural daylight, crisp sharp focus, airy open framing.',
+  };
+  return map[emotion] || `Evoke a sense of ${emotion} through lighting, color grading, and pacing.`;
+}
+
+function toneToVisual(tone: string): string {
+  const map: Record<string, string> = {
+    'Kích thích': 'Fast dynamic transitions, bold on-screen energy, urgent pacing.',
+    'Sang trọng': 'Slow deliberate pacing, minimal motion, refined elegant composition.',
+    'Cảm xúc': 'Soft focus emotional close-ups, lingering shots, gentle movement.',
+    'Bán hàng': 'Product prominently centered, clear bright presentation, confident direct framing.',
+    'Viral': 'Unexpected angle, eye-catching moment in first 2 seconds, punchy quick cuts.',
+    'Review': 'Steady medium shots, natural authentic lighting, documentary-style framing.',
+    'Giáo dục': 'Clear well-lit step-by-step framing, close-up detail shots, organized composition.',
+    'Kể chuyện': 'Cinematic wide establishing shots, smooth narrative transitions, atmospheric depth.',
+    'Hài hước': 'Playful unconventional angles, exaggerated reactions, bouncy light movement.',
+  };
+  return map[tone] || `Visual presentation should reflect a ${tone} tone throughout.`;
+}
 
 const DEBUG_LOG = path.join(process.cwd(), "foodiegen-debug.log");
 function appendDebug(...args: any[]) {
@@ -57,6 +87,7 @@ export async function POST(req: Request) {
       emotion,
       activeStyle,
     } = body;
+    const motionIntensity = Number(body.motionIntensity ?? 50);
 
     if (!topic) {
       return NextResponse.json(
@@ -520,6 +551,146 @@ The invitation must reference the brand when available and be polite, complete, 
       },
     });
 
+    // Build suggestedPrompt for Runway web UI copy-paste (fully English, hard cap: 1000 chars)
+    let suggestedPrompt = '';
+    try {
+      const charDef = CHARACTERS.find((c: any) => c.id === characterId);
+      const resolvedGender = charDef?.gender || characterType;
+      const genderInEng = resolvedGender === 'Nam' ? 'Male' : resolvedGender === 'Nữ' ? 'Female' : '';
+
+      // First sentence only — no trailing period so template adds its own
+      const fullCharDesc = charDef?.englishDescription || (genderInEng ? `${genderInEng} character` : 'character');
+      const firstPeriod = fullCharDesc.indexOf('.');
+      const charDesc = firstPeriod > 0 ? fullCharDesc.slice(0, firstPeriod) : fullCharDesc;
+
+      // Translate preset locations to English; fall back to generic for custom values
+      const locationMap: Record<string, string> = {
+        'Tại cửa hàng': 'inside the store',
+        'Trung tâm thương mại': 'inside a shopping mall',
+        'Nhà bếp hiện đại': 'in a modern kitchen',
+        'Quầy thực phẩm': 'at a food counter',
+        'Ngoài trời / Đường phố': 'outdoor street setting',
+      };
+      const locEng = locationMap[locationContext] || 'a cinematic indoor setting';
+
+      const styleKw = (activeStyle || 'cinematic').toLowerCase();
+      const motionKw = motionIntensity > 70 ? 'fluid cinematic motion' : 'stable shot, locked geometry';
+      const hasImage = !!(productImage && productImage.includes('base64,'));
+
+      // English technicalKeywords from all scenes — strip non-ASCII (Vietnamese leakage) then cut at word boundary
+      const allTech = scenes
+        .map((s: any) => s.technicalKeywords || '')
+        .filter(Boolean)
+        .join(', ')
+        // Remove non-ASCII segments (e.g. "character: Bếp trưởng Hoàng") that Gemini injects
+        .replace(/[^\x00-\x7F]+[^,]*/g, '')
+        .replace(/,\s*,/g, ',')
+        .replace(/^,\s*|,\s*$/g, '')
+        .trim();
+      // Cap techDesc at 150 chars (word boundary) to leave budget for all other sections
+      const techMax = 150;
+      const techDesc = allTech.length <= techMax
+        ? allTech
+        : allTech.slice(0, techMax).replace(/,?\s+\S*$/, '');
+
+      // Extract English food noun from technicalKeywords for T2V food description
+      const FOOD_NOUNS = [
+        'mooncake', 'cake', 'pizza', 'burger', 'pho', 'noodle', 'noodles', 'rice',
+        'meat', 'fish', 'chicken', 'steak', 'salad', 'soup', 'bread', 'roll', 'rolls',
+        'sushi', 'dumpling', 'dumplings', 'spring roll', 'croissant', 'sandwich',
+        'tart', 'pudding', 'waffle', 'banh', 'bun', 'buns', 'bowl', 'skewer',
+        'naan', 'curry', 'ramen', 'udon', 'pasta', 'bruschetta', 'crepe',
+      ];
+      // 1. Try to detect food from Vietnamese topic (most reliable source)
+      const VN_FOOD_MAP: Array<[RegExp, string]> = [
+        [/bánh trung thu/i,       'mooncake'],
+        [/phở/i,                  'pho'],
+        [/bánh mì/i,              'banh mi'],
+        [/bún bò/i,               'beef noodle soup'],
+        [/bún/i,                  'noodle bowl'],
+        [/mì |mỳ /i,              'noodle soup'],
+        [/lẩu/i,                  'hot pot'],
+        [/pizza/i,                'pizza'],
+        [/burger|hamburger/i,     'burger'],
+        [/sushi/i,                'sushi'],
+        [/bánh kem|bánh sinh nhật/i, 'cake'],
+        [/bánh cuốn/i,            'rice roll'],
+        [/bánh xèo/i,             'sizzling crepe'],
+        [/bánh/i,                 'pastry'],
+        [/cơm/i,                  'rice dish'],
+        [/gà/i,                   'chicken dish'],
+        [/bò|thịt bò/i,           'beef dish'],
+        [/heo|lợn/i,              'pork dish'],
+        [/cá /i,                  'fish dish'],
+        [/tôm/i,                  'shrimp dish'],
+        [/thịt/i,                 'meat dish'],
+      ];
+      let topicFoodNoun = '';
+      for (const [pattern, eng] of VN_FOOD_MAP) {
+        if (pattern.test(topic)) { topicFoodNoun = eng; break; }
+      }
+
+      // 2. Fallback: extract from English technicalKeywords
+      const foodNounMatch = allTech.toLowerCase().match(
+        new RegExp(`\\b(${FOOD_NOUNS.join('|')})s?\\b`)
+      );
+      // Topic-derived noun takes priority (more reliable than keyword extraction)
+      const detectedNoun = topicFoodNoun || (foodNounMatch ? foodNounMatch[0].toLowerCase() : '');
+
+      // Food-specific visual descriptors — give T2V models precise appearance to render
+      const FOOD_VISUAL_DESCRIPTORS: Record<string, string> = {
+        'mooncake': 'traditional round mooncake, golden-amber baked crust with warm glaze sheen, deeply embossed decorative lotus and scroll patterns on top surface, rich caramel-brown color darker at edges, placed on white ceramic plate',
+        'mooncakes': 'traditional round mooncakes, golden-amber baked crust with warm glaze sheen, deeply embossed decorative lotus and scroll patterns on top surface, rich caramel-brown color darker at edges',
+        'pizza': 'freshly baked pizza with bubbling melted cheese, crispy golden crust, vibrant colorful toppings',
+        'burger': 'stacked gourmet burger with juicy patty, fresh lettuce, tomato, melting cheese, toasted sesame bun',
+        'pho': 'steaming pho bowl with clear golden broth, flat rice noodles, fresh herbs, thinly sliced beef',
+        'sushi': 'artfully arranged sushi pieces with glistening fresh fish, perfectly formed rice, vibrant colors',
+        'dumpling': 'delicate dumplings with pleated wrapping, light steam rising, dipping sauce alongside',
+        'dumplings': 'delicate dumplings with pleated wrapping, light steam rising, dipping sauce alongside',
+        'croissant': 'flaky golden croissant with laminated layers, buttery shine, light steam curling upward',
+        'cake': 'elegant layered cake with smooth frosting, decorative details, soft interior visible at slice',
+        'steak': 'perfectly seared steak with caramelized crust, pink juicy interior, herbs and butter melting on top',
+        'ramen': 'steaming ramen bowl with rich amber broth, springy noodles, soft-boiled egg, chashu pork slices',
+      };
+      const foodVisualDesc = FOOD_VISUAL_DESCRIPTORS[detectedNoun] || null;
+      const foodLabel = foodVisualDesc || (detectedNoun ? detectedNoun.charAt(0).toUpperCase() + detectedNoun.slice(1) : 'food dish');
+
+      // Concise phase descriptions — keep each section short so all sections fit under 1000 chars
+      const parts = hasImage
+        ? [
+            `Cinematic food marketing video, single continuous shot, no cuts.`,
+            `FOOD PHASE (first 60%): Food from reference image — macro close-up, locked geometry, zero morphing, perfect texture & pattern fidelity. Slow tilt revealing full dish.`,
+            `REVEAL PHASE (final 40%): Camera pulls back to reveal ${charDesc} PHYSICALLY HOLDING the dish with both hands, presenting it to camera. Real 3D person — body sway, genuine smile, active micro-expressions. NOT a static pose or 2D banner.`,
+            techDesc ? `TECHNICAL: ${techDesc}.` : '',
+            `LOCATION: ${locEng}.`,
+            `STYLE: ${styleKw}, 4K, warm golden cinematic lighting. ${motionKw}.`,
+            emotion ? emotionToVisual(emotion) : '',
+            tone ? toneToVisual(tone) : '',
+          ]
+        : [
+            `Cinematic food marketing video, single continuous shot, no cuts.`,
+            `FOOD PHASE (first 60%): ${foodLabel} on white plate — macro close-up, photorealistic textures, warm glistening surface, rich color depth. Locked geometry, no morphing. Slow tilt revealing full dish.`,
+            `REVEAL PHASE (final 40%): Camera pulls back to reveal ${charDesc} physically holding the dish, presenting it warmly to camera. Real 3D person in natural motion — genuine smile, subtle body movement. NOT a static pose or 2D graphic.`,
+            techDesc ? `TECHNICAL: ${techDesc}.` : '',
+            `LOCATION: ${locEng}.`,
+            `STYLE: ${styleKw}, 4K, warm golden cinematic lighting. ${motionKw}.`,
+            emotion ? emotionToVisual(emotion) : '',
+            tone ? toneToVisual(tone) : '',
+          ];
+
+      // Join and cut at last sentence boundary if over 1000 chars (never cut mid-sentence)
+      const raw = parts.filter(Boolean).join(' ');
+      if (raw.length <= 1000) {
+        suggestedPrompt = raw;
+      } else {
+        const truncated = raw.slice(0, 997);
+        const lastStop = truncated.lastIndexOf('. ');
+        suggestedPrompt = lastStop > 700 ? raw.slice(0, lastStop + 1) : truncated + '...';
+      }
+    } catch (spErr) {
+      console.warn('[CONTENT] Failed to build suggestedPrompt:', spErr);
+    }
+
     console.log("[V8-DEBUG] SUCCESS. Script ID:", script.id);
     return NextResponse.json({
       projectId: finalProjectId,
@@ -528,6 +699,7 @@ The invitation must reference the brand when available and be polite, complete, 
       fullAudioScript,
       fullNaturalLanguageScript: fullNaturalLanguageScript || fullAudioScript,
       warning: warning || (result as any)?.__forced_warning,
+      suggestedPrompt,
     });
   } catch (error: any) {
     console.error("[V8-CRITICAL] API Error:", error);

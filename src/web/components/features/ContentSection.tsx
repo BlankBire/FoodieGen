@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { TONES, CHARACTERS } from '../../constants';
-import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText, Tag, Film } from 'lucide-react';
+import { Search, ChevronDown, User, PlusCircle, MapPin, Sparkles, FileText, Tag, Film, Check } from 'lucide-react';
 import { AIModelType } from '../../types';
 
 interface ContentSectionProps {
@@ -30,6 +30,7 @@ interface ContentSectionProps {
   model: AIModelType;
   videoScenes?: any[];
   isScriptDisabled?: boolean;
+  suggestedPrompt?: string;
 }
 
 const PRESET_LOCATIONS = [
@@ -74,7 +75,8 @@ export const ContentSection = ({
   setVoiceGender,
   model,
   videoScenes = [],
-  isScriptDisabled = false
+  isScriptDisabled = false,
+  suggestedPrompt = ''
 }: ContentSectionProps) => {
   // Location custom state
   const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
@@ -95,6 +97,16 @@ export const ContentSection = ({
     }
     return '';
   });
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyPrompt = () => {
+    if (!suggestedPrompt) return;
+    navigator.clipboard.writeText(suggestedPrompt).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   // Whether this workflow uses manual script pasting (no AI generation)
   const isManualMode = model === 'runway_manual';
@@ -433,17 +445,68 @@ export const ContentSection = ({
               </div>
             )}
 
-            <textarea 
-              className="form-textarea" 
-              placeholder={isManualMode 
-                ? "Dán kịch bản có sẵn từ bên ngoài vào đây... (VD: nội dung bài viết, mô tả sản phẩm, kịch bản marketing...)" 
+            <textarea
+              className="form-textarea"
+              placeholder={isManualMode
+                ? "Dán kịch bản có sẵn từ bên ngoài vào đây... (VD: nội dung bài viết, mô tả sản phẩm, kịch bản marketing...)"
                 : "Kịch bản sẽ xuất hiện tại đây..."
-              } 
-              style={{ minHeight: 120, borderColor: 'var(--border-accent)' }} 
-              value={script} 
-              onChange={e => setScript(e.target.value)} 
+              }
+              style={{ minHeight: 120, borderColor: 'var(--border-accent)' }}
+              value={script}
+              onChange={e => setScript(e.target.value)}
             />
           </div>
+
+          {/* Prompt gợi ý — chỉ hiện sau khi AI tạo kịch bản thành công */}
+          {!isManualMode && suggestedPrompt && (
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div>
+                  <label className="form-label" style={{ marginBottom: 0, fontWeight: 700, color: '#b45309' }}>
+                    PROMPT GỢI Ý
+                  </label>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Copy và dán vào <strong>app.runwayml.com</strong> để test trực tiếp.
+                  </p>
+                </div>
+                <button
+                  className="btn-icon-small"
+                  onClick={handleCopyPrompt}
+                  style={copied ? {
+                    background: 'rgba(34,197,94,0.12)',
+                    color: '#16a34a',
+                    border: '1px solid rgba(34,197,94,0.3)',
+                    flexShrink: 0
+                  } : { flexShrink: 0 }}
+                >
+                  {copied ? (
+                    <><Check size={13} /> Đã copy</>
+                  ) : (
+                    <><FileText size={13} /> Copy</>
+                  )}
+                </button>
+              </div>
+              <div style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 10,
+                padding: '12px 14px',
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: 140,
+                overflowY: 'auto',
+              }}>
+                {suggestedPrompt}
+              </div>
+              <p style={{ fontSize: 11, color: suggestedPrompt.length > 1000 ? '#dc2626' : 'var(--text-muted)', margin: '6px 0 0', textAlign: 'right' }}>
+                Prompt: {suggestedPrompt.length} ký tự (giới hạn Runway: 1000)
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

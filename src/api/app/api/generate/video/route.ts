@@ -734,49 +734,60 @@ export async function POST(req: Request) {
         
         const combinedDesc = clipScenes.map(s => `${s.visualDescription} ${s.technicalKeywords}`).join(' ');
         
-        // Context Injection để giữ tính nhất quán
-        const consistencyContext = i > 0 
-            ? `CONTINUITY: This is segment ${i+1} of a long sequence. Maintain exact same ${mainCharacter} appearance, clothing, and the ${locationContext} background from the previous clip. No jumping locations.` 
-            : "START SCENE: High fidelity macro focus on food, then reveal character.";
+        // Food là HERO, character là PHỤ — nhất quán qua tất cả clip
+        const continuityNote = i > 0
+            ? `CONTINUITY: Identical food appearance and ${locationContext} setting as previous clip. Same character.`
+            : `OPENING: Begin with extreme macro close-up of the food.`;
 
         // === VISUAL PROMPT ===
-        // Gen-4 Turbo I2V: image adherence rất mạnh → dùng interaction-based prompt
-        // để buộc model spawn nhân vật vào không gian chứa ảnh đồ ăn (spatial relationship).
-        // Gen-4.5 và các model khác: labeled sections để AI không bỏ qua nhân vật/bối cảnh.
+        // Priority: Food (70%+ screen time) > Location > Character (brief, secondary)
+        // Gen-4 Turbo I2V: interaction-based để spawn character vào không gian ảnh đồ ăn.
+        // Các model khác: labeled sections, food đứng đầu.
+        const style = config?.style || config?.activeStyle || 'cinematic';
         const isGen4Turbo = selectedModel === 'runway' && config?.runwayModel === 'gen4_turbo' && !!productImage;
 
         const visualPrompt = isGen4Turbo
             ? [
-                // Nhân vật + tương tác với đồ ăn trong ảnh → model phải tính spatial relationship
-                `${englishCharacterDesc} seated before the dish from the reference image,`,
-                `${combinedDesc.slice(0, 150)},`,
-                `making natural eye contact with camera.`,
+                // Food hero trước, character xuất hiện thoáng qua ở rìa frame
+                `Cinematic macro close-up of the food from the reference image — the HERO of this video.`,
+                `Exact shape, texture, surface patterns, and color from the reference preserved with perfect fidelity.`,
+                `Only slow, smooth camera movements — zero morphing, zero shape distortion allowed.`,
+                `${englishCharacterDesc} briefly visible at frame edge as supporting context.`,
                 `Setting: ${locationContext}.`,
-                `${config?.style || config?.activeStyle || 'Cinematic'} style, professional 4K lighting. ${motionKeyword}.`,
+                `${style} food marketing style, 4K lighting that enhances food texture. ${motionKeyword}.`,
                 config?.emotion ? emotionToVisual(config.emotion) : '',
                 config?.tone ? toneToVisual(config.tone) : '',
-                i > 0 ? `Same character appearance and setting as previous clip.` : `Reveal shot from food close-up to character with dish.`
+                continuityNote
               ].filter(Boolean).join(' ')
-            : [
-                // [1] NHÂN VẬT - Đặt đầu tiên để AI ưu tiên render (Sử dụng tiếng Anh)
-                `SCENE: A ${c.duration}-second cinematic food marketing video.`,
-                `MAIN CHARACTER (REQUIRED): ${englishCharacterDesc}.`,
-                `CHARACTER ACTION: The character is actively ${combinedDesc.slice(0, 200)}.`,
-                `CHARACTER BEHAVIOR: Visible natural facial expressions, mouth moving naturally while speaking, direct eye contact with camera.`,
-                // [2] BỐI CẢNH - Phải rõ ràng để AI tạo đúng location
-                `LOCATION & BACKGROUND (REQUIRED): ${locationContext}. The setting must be clearly established with appropriate props, lighting, and environmental details.`,
-                // [3] SẢN PHẨM - Tham chiếu ảnh mẫu nhưng là phần phụ trợ
-                productImage
-                  ? `PRODUCT (use reference image as anchor): The food/product from the reference image is prominently featured. Maintain 100% geometric fidelity to the source image — no morphing, no shape changes.`
-                  : `PRODUCT: ${combinedDesc.slice(200, 400)}. Photorealistic, appetizing presentation.`,
-                // [4] KỸ THUẬT & PHONG CÁCH
-                `CINEMATOGRAPHY: ${config?.style || config?.activeStyle || 'cinematic'} style. Professional 4K lighting. ${motionKeyword}.`,
-                consistencyContext,
-                config?.emotion ? `MOOD & ATMOSPHERE: ${config.emotion}. ${emotionToVisual(config.emotion)}` : '',
-                config?.tone ? `CONTENT TONE: ${config.tone}. ${toneToVisual(config.tone)}` : '',
-                config?.transitions === false ? `Continuous single shot, no cuts.` : '',
-                config?.charConsistency ? `CONSISTENCY: Maintain exact character appearance across all frames.` : ''
-              ].filter(Boolean).join(' ');
+            : productImage
+              ? [
+                  // === I2V: ảnh mẫu là chuẩn tuyệt đối ===
+                  `SCENE: A ${c.duration}-second cinematic food marketing video. Food is the PRIMARY HERO.`,
+                  `FOOD (HERO SUBJECT): The food from the reference image dominates 70%+ of screen time. Ultra-sharp macro focus on every texture and detail.`,
+                  `SHAPE FIDELITY (CRITICAL): Reproduce the EXACT shape, surface texture, embossed patterns, and color from the reference image. ZERO morphing. ZERO shape distortion during any camera movement. Only minimal, slow camera motion is permitted to preserve the food's geometry.`,
+                  `CHARACTER (SECONDARY): ${englishCharacterDesc}. Brief appearance at frame edge or background only — supporting role, NOT the focus.`,
+                  `CHARACTER ACTION: ${combinedDesc.slice(0, 80)}.`,
+                  `LOCATION: ${locationContext}.`,
+                  `STYLE: ${style}, 4K lighting that makes the food irresistible. ${motionKeyword}.`,
+                  continuityNote,
+                  config?.emotion ? emotionToVisual(config.emotion) : '',
+                  config?.tone ? toneToVisual(config.tone) : '',
+                  config?.transitions === false ? `Single continuous shot, no cuts.` : ''
+                ].filter(Boolean).join(' ')
+              : [
+                  // === T2V: mô tả đồ ăn chi tiết nhất có thể ===
+                  `SCENE: A ${c.duration}-second cinematic food marketing video. Food is the PRIMARY HERO.`,
+                  `FOOD (HERO SUBJECT): ${combinedDesc.slice(0, 200)}. The food dominates 70%+ of screen time. Extreme macro close-up showcasing every appetizing detail.`,
+                  `FOOD APPEARANCE & STABILITY: Photorealistic food with perfectly consistent shape, color, and texture across ALL frames. NO morphing. NO shape changes. NO distortion from first to last frame.`,
+                  `CHARACTER (SECONDARY): ${englishCharacterDesc}. Brief appearance in background — supporting role only.`,
+                  `CHARACTER ACTION: ${combinedDesc.slice(200, 300)}.`,
+                  `LOCATION: ${locationContext}.`,
+                  `STYLE: ${style}, 4K lighting. ${motionKeyword}.`,
+                  continuityNote,
+                  config?.emotion ? emotionToVisual(config.emotion) : '',
+                  config?.tone ? toneToVisual(config.tone) : '',
+                  config?.transitions === false ? `Single continuous shot, no cuts.` : ''
+                ].filter(Boolean).join(' ');
 
         // Runway API: giới hạn cứng 1000 ký tự cho promptText
         // Veo / Kling: không có giới hạn này → cho phép tới 1500 ký tự

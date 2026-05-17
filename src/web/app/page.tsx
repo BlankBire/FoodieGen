@@ -57,6 +57,7 @@ export default function Home() {
   const [videoScenes,    setVideoScenes]    = useState<any[]>([])
   const [rawScenes,      setRawScenes]      = useState<any[]>([])
   const [productImage,   setProductImage]   = useState<string | null>(null)
+  const [suggestedPrompt,setSuggestedPrompt]= useState('')
 
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
@@ -154,6 +155,27 @@ export default function Home() {
     }, 8000)
   }
 
+  const buildSuggestedPrompt = (scenes: any[]): string => {
+    if (!scenes || scenes.length === 0) return '';
+    const firstScene = scenes[0];
+    const combinedDesc = `${firstScene.visualDescription || ''} ${firstScene.technicalKeywords || ''}`.trim();
+    const charDef = CHARACTERS.find(c => c.id === characterId);
+    const engChar = charDef?.englishDescription || (characterType === 'Nam' ? 'Male character' : 'Female character');
+    const motionKw = motionIntensity > 70 ? 'Fluid cinematic motion' : 'Stable shot, locked geometry';
+    const parts = [
+      `SCENE: A cinematic food marketing video. Food is the PRIMARY HERO.`,
+      productImage
+        ? `FOOD (HERO): Food from the reference image dominates 70%+ of screen time. SHAPE FIDELITY (CRITICAL): Exact shape, texture, patterns from reference. ZERO morphing. Slow smooth camera only.`
+        : `FOOD (HERO): ${combinedDesc.slice(0, 180)}. Dominates 70%+ of screen time. Photorealistic, consistent shape — NO morphing, NO distortion across all frames.`,
+      `CHARACTER (SECONDARY): ${engChar}. Brief appearance only.`,
+      `LOCATION: ${locationContext}.`,
+      `STYLE: ${activeStyle} style, 4K lighting. ${motionKw}.`,
+      emotion ? `MOOD: ${emotion}.` : '',
+      activeTone ? `TONE: ${activeTone}.` : '',
+    ].filter(Boolean).join(' ');
+    return parts.slice(0, 1000);
+  };
+
   const handleReset = () => {
     // Reset Video Config
     setResolution('720p')
@@ -189,6 +211,7 @@ export default function Home() {
     setAudioUrl('')
     setVideoScenes([])
     setProductImage(null)
+    setSuggestedPrompt('')
     setStatus('')
     setProjectId('')
     setScriptId('')
@@ -360,7 +383,8 @@ export default function Home() {
           productImage,
           duration,
           emotion,
-          activeStyle
+          activeStyle,
+          motionIntensity
         }),
       })
       const data = await res.json()
@@ -384,7 +408,10 @@ export default function Home() {
         }
 
         setScript(displayParts.join('\n\n'))
-        if (data.scenes) setRawScenes(data.scenes)
+        if (data.scenes) {
+          setRawScenes(data.scenes)
+          setSuggestedPrompt(data.suggestedPrompt || buildSuggestedPrompt(data.scenes))
+        }
         if (data.scriptId) setScriptId(data.scriptId)
         if (data.projectId) setProjectId(data.projectId)
         showToast('Tạo kịch bản thành công!')
@@ -592,6 +619,7 @@ export default function Home() {
             setVoiceGender={setVoiceGender}
             model={model}
             isScriptDisabled={model === 'runway_ai' && runwayModelPref === 'gen4_turbo' && !productImage}
+            suggestedPrompt={suggestedPrompt}
           />
 
           <VisualAudioSection 

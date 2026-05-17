@@ -277,10 +277,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             <Settings size={20} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#1e293b' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
               Cấu hình API
             </h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>
               Thiết lập mã API để bắt đầu tạo video
             </p>
           </div>
