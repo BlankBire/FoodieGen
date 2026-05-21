@@ -62,71 +62,21 @@ Upload ảnh sản phẩm → Gen-4 Turbo giữ nguyên hình dạng, pattern em
 
 ---
 
-## Hướng dẫn cài đặt
+## Yêu cầu hệ thống
 
-### Yêu cầu hệ thống
-- Node.js v18 trở lên
-- Windows 10/11
-
-### Triển khai môi trường lập trình
-
-1. **Clone dự án**:
-   ```bash
-   git clone https://github.com/BlankBire/FoodieGen.git
-   cd FoodieGen
-   ```
-
-2. **Cài đặt dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Cấu hình biến môi trường**:
-   ```bash
-   cp src/api/.env.example src/api/.env
-   ```
-   Mở `src/api/.env` và điền các API Key cần thiết. Các API Key còn lại (Runway, Kling, FPT.AI) được nhập trực tiếp trong giao diện **Cài đặt** của ứng dụng.
-
-4. **Chạy ở chế độ Development**:
-   ```bash
-   npm run electron:dev
-   ```
+- Windows 10/11 (64-bit)
+- Kết nối Internet để gọi các API AI
 
 ---
 
-## Đóng gói ứng dụng
+## Đóng góp & Phản hồi
 
-```bash
-npm run electron:build
-```
-
-File cài đặt xuất ra tại `dist/FoodieGen Setup x.x.x.exe`. Bản build đã tích hợp sẵn FFmpeg, Prisma engine, và quy trình tự khởi tạo database khi cài lần đầu.
-
----
-
-## Cấu trúc dự án
-
-```
-├── electron/           # Electron Main & Preload process
-├── src/
-│   ├── api/            # Backend Next.js Standalone (API routes, Prisma, FFmpeg)
-│   │   ├── app/api/    # Endpoints: generate/content, generate/video, media
-│   │   ├── lib/        # Constants (characters, voices, styles)
-│   │   └── prisma/     # SQLite schema & seed
-│   └── web/            # Frontend Next.js (UI, components)
-├── scripts/            # Build optimization & binary scripts
-├── bin/                # FFmpeg binary (Windows)
-└── package.json        # Monorepo config & build scripts
-```
-
----
-
-## Đóng góp
-
-Mọi ý kiến đóng góp hoặc báo lỗi vui lòng mở Issue hoặc gửi Pull Request.
+Mọi ý kiến phản hồi hoặc báo lỗi vui lòng mở Issue trên GitHub.
 
 ---
 
 ## Giấy phép
 
-Dự án này thuộc sở hữu của **BlankBire**. Vui lòng liên hệ tác giả trước khi sử dụng cho mục đích thương mại.
+Copyright (c) 2025 BlankBire. All Rights Reserved.
+
+Phần mềm này là tài sản độc quyền của **BlankBire**. Mọi hành vi sao chép, phân phối, hay sử dụng thương mại đều bị nghiêm cấm nếu không có sự cho phép bằng văn bản từ tác giả. Xem chi tiết tại [LICENSE](LICENSE).
