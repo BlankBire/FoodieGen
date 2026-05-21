@@ -418,11 +418,13 @@ The invitation must reference the brand when available and be polite, complete, 
         const isRetryable =
           errString.includes("503") ||
           errString.toLowerCase().includes("high demand") ||
-          errString.includes("UNAVAILABLE");
+          errString.includes("UNAVAILABLE") ||
+          errString.includes('"code":500') ||
+          errString.includes("INTERNAL");
 
         if (isRetryable && attempts < maxAttempts) {
           console.warn(
-            `[GEMINI-RETRY] 503/High Demand. Attempt ${attempts}/${maxAttempts}...`,
+            `[GEMINI-RETRY] Transient error. Attempt ${attempts}/${maxAttempts}...`,
           );
           await new Promise((r) => setTimeout(r, 4000)); // Đợi 4s
           continue;
@@ -559,7 +561,7 @@ The invitation must reference the brand when available and be polite, complete, 
       const genderInEng = resolvedGender === 'Nam' ? 'Male' : resolvedGender === 'Nữ' ? 'Female' : '';
 
       // First sentence only — no trailing period so template adds its own
-      const fullCharDesc = charDef?.englishDescription || (genderInEng ? `${genderInEng} character` : 'character');
+      const fullCharDesc = charDef?.englishDescription || (genderInEng ? `Vietnamese ${genderInEng.toLowerCase()} person with black hair and East Asian features` : 'Vietnamese person with black hair and East Asian features');
       const firstPeriod = fullCharDesc.indexOf('.');
       const charDesc = firstPeriod > 0 ? fullCharDesc.slice(0, firstPeriod) : fullCharDesc;
 
@@ -655,24 +657,35 @@ The invitation must reference the brand when available and be polite, complete, 
       const foodVisualDesc = FOOD_VISUAL_DESCRIPTORS[detectedNoun] || null;
       const foodLabel = foodVisualDesc || (detectedNoun ? detectedNoun.charAt(0).toUpperCase() + detectedNoun.slice(1) : 'food dish');
 
-      // Concise phase descriptions — keep each section short so all sections fit under 1000 chars
+      // Universal narrative rules (synced with video/route.ts):
+      // 1. Food opens video in macro close-up (character just outside frame), dominates first 50%.
+      // 2. Camera widens — character was always there just off-frame, comes into view.
+      // 3. Character: smile, gentle gestures — real 3D person, NOT split screen/banner/cutout.
+      // 4. Background clearly shows chosen location.
+      const isAiCharacter = characterId === 'ai_character';
+      const depthNote = isAiCharacter
+        ? 'Stylized 3D depth, expressive animated character design (Pixar/Disney style).'
+        : 'Full 3D depth, realistic skin texture.';
+
+      const sharedCharReveal = hasImage
+        ? `The camera angle widens naturally — ${charDesc}, who has been standing just outside the initial tight frame, comes into view beside the food in ${locEng}. Same continuous unbroken 3D scene, no cut, no transition. Character looks toward camera with a genuine warm smile, natural head nods and gentle hand gestures as if describing the food. Minimal physical contact with food. ${depthNote} Background shows ${locEng}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a banner, NOT a cutout.`
+        : `The camera angle widens naturally — ${charDesc}, who has been standing just outside the initial tight frame, comes into view beside the ${detectedNoun || 'dish'} in ${locEng}. Same continuous unbroken 3D scene, no cut, no transition. Character looks toward camera with a genuine warm smile, gentle hand gestures as if describing the food. ${depthNote} Background shows ${locEng}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a banner, NOT a cutout.`;
+
       const parts = hasImage
         ? [
             `Cinematic food marketing video, single continuous shot, no cuts.`,
-            `FOOD PHASE (first 60%): Food from reference image — macro close-up, locked geometry, zero morphing, perfect texture & pattern fidelity. Slow tilt revealing full dish.`,
-            `REVEAL PHASE (final 40%): Camera pulls back to reveal ${charDesc} PHYSICALLY HOLDING the dish with both hands, presenting it to camera. Real 3D person — body sway, genuine smile, active micro-expressions. NOT a static pose or 2D banner.`,
+            `FOOD PHASE (first 50%): Macro close-up of the food fills the entire frame — character is just outside this tight shot. Preserve 100%: exact shape, all embossed surface patterns, brand markings, color, and serving context — pixel-identical to reference at every frame. Slow gentle camera drift. No morphing, no prop substitution.`,
+            `REVEAL PHASE (final 50%): ${sharedCharReveal}`,
             techDesc ? `TECHNICAL: ${techDesc}.` : '',
-            `LOCATION: ${locEng}.`,
             `STYLE: ${styleKw}, 4K, warm golden cinematic lighting. ${motionKw}.`,
             emotion ? emotionToVisual(emotion) : '',
             tone ? toneToVisual(tone) : '',
           ]
         : [
             `Cinematic food marketing video, single continuous shot, no cuts.`,
-            `FOOD PHASE (first 60%): ${foodLabel} on white plate — macro close-up, photorealistic textures, warm glistening surface, rich color depth. Locked geometry, no morphing. Slow tilt revealing full dish.`,
-            `REVEAL PHASE (final 40%): Camera pulls back to reveal ${charDesc} physically holding the dish, presenting it warmly to camera. Real 3D person in natural motion — genuine smile, subtle body movement. NOT a static pose or 2D graphic.`,
+            `FOOD PHASE (first 50%): ${foodLabel} — macro close-up fills the frame, character just outside this tight shot. Photorealistic textures, warm glistening surface. Perfectly consistent shape and color. Locked geometry, no morphing.`,
+            `REVEAL PHASE (final 50%): ${sharedCharReveal}`,
             techDesc ? `TECHNICAL: ${techDesc}.` : '',
-            `LOCATION: ${locEng}.`,
             `STYLE: ${styleKw}, 4K, warm golden cinematic lighting. ${motionKw}.`,
             emotion ? emotionToVisual(emotion) : '',
             tone ? toneToVisual(tone) : '',

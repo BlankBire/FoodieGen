@@ -1,11 +1,65 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import RunwayML from '@runwayml/sdk';
+import RunwayML, { toFile } from '@runwayml/sdk';
 import { GoogleGenAI } from '@google/genai';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
-import { CHARACTERS, VOICES } from '../../../../lib/constants';
+import sharp from 'sharp';
+import { CHARACTERS } from '../../../../lib/constants';
+
+async function resizeImageForRunway(base64DataUri: string, ratio: string = '720:1280'): Promise<string> {
+  const match = base64DataUri.match(/^data:[^;]+;base64,(.+)$/);
+  if (!match) return base64DataUri;
+  let buffer: Buffer = Buffer.from(match[1], 'base64');
+
+  // Normalize exotic formats (HEIC, WebP, TIFF) → JPEG before processing
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (meta.format && !['jpeg', 'png', 'gif'].includes(meta.format)) {
+      buffer = Buffer.from(await sharp(buffer).jpeg({ quality: 90 }).toBuffer());
+    }
+  } catch { /* keep original buffer if metadata fails */ }
+
+  const [tw, th] = ratio.split(':').map(Number);
+  const targetW = tw <= 1280 ? tw : 1280;
+  const targetH = th <= 1280 ? th : 1280;
+
+  // Scale image so its width fills targetW, preserving aspect ratio (no crop horizontally)
+  const meta = await sharp(buffer).metadata();
+  const origW = meta.width || targetW;
+  const origH = meta.height || targetH;
+  const scaledH = Math.round(origH * targetW / origW);
+
+  if (scaledH >= targetH) {
+    // Image is already taller than target after scaling → center crop vertically (no side padding needed)
+    const cropTop = Math.floor((scaledH - targetH) / 2);
+    const result = await sharp(buffer)
+      .resize(targetW, scaledH)
+      .extract({ left: 0, top: cropTop, width: targetW, height: targetH })
+      .jpeg({ quality: 88 })
+      .toBuffer();
+    return `data:image/jpeg;base64,${result.toString('base64')}`;
+  }
+
+  // Image is shorter than target (e.g. square source in portrait frame) → mirror-fill top & bottom.
+  // Mirror-fill: Sharp reflects the image edges into the padding zones, producing sharp, natural-looking
+  // content that Runway reads as one continuous scene — no blur confusion, no empty zones.
+  const padTotal = targetH - scaledH;
+  const padTop = Math.floor(padTotal / 2);
+  const padBottom = padTotal - padTop;
+
+  const scaledBuffer = await sharp(buffer)
+    .resize(targetW, scaledH)
+    .toBuffer();
+
+  const result = await sharp(scaledBuffer)
+    .extend({ top: padTop, bottom: padBottom, left: 0, right: 0, extendWith: 'mirror' })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${result.toString('base64')}`;
+}
 
 function emotionToVisual(emotion: string): string {
   const map: Record<string, string> = {
@@ -95,10 +149,11 @@ ${tone ? `8. TONE NỘI DUNG: ${tone}. Giọng điệu kịch bản phải chu�
       attempts++;
       const errStr = JSON.stringify(e);
       const is503 = e.status === 503 || errStr.includes('503');
+      const is500 = e.status === 500 || errStr.includes('"code":500') || errStr.includes('INTERNAL');
       const is429 = e.status === 429 || errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED');
 
-      if (is503 && attempts < maxAttempts) {
-        console.log(`[GEMINI-RETRY-VIDEO] 503 High Demand. Attempt ${attempts}...`);
+      if ((is503 || is500) && attempts < maxAttempts) {
+        console.log(`[GEMINI-RETRY-VIDEO] ${is500 ? '500 Internal' : '503 High Demand'}. Attempt ${attempts}...`);
         await new Promise(r => setTimeout(r, 3000));
         continue;
       }
@@ -179,9 +234,9 @@ async function generateAudioTask(
       let audioBuffer: Buffer | null = null;
       
       // Đợi lâu hơn trước poll đầu tiên để FPT có thời gian xử lý
-      await new Promise(r => setTimeout(r, 3000));
-      
-      const maxPolls = 20; // 20 polls × 3s = 60s
+      await new Promise(r => setTimeout(r, 6000));
+
+      const maxPolls = 30; // 30 polls × 3s = 90s
       for (let i = 0; i < maxPolls; i++) {
         try {
           const checkRes = await fetch(asyncUrl);
@@ -273,8 +328,20 @@ async function generateVideoTask(
       };
 
       if (promptImage) {
-        payload.promptImage = promptImage;
-        // gen4_turbo là I2V model → dùng imageToVideo SDK, fallback textToVideo nếu SDK cũ
+        // Runway imageToVideo requires an HTTPS URL or Runway URI — base64 is NOT supported.
+        // Upload the image first, then pass the returned runway:// URI.
+        let imageUri = promptImage;
+        if (promptImage.startsWith('data:')) {
+          const resizedDataUri = await resizeImageForRunway(promptImage, ratio);
+          const match = resizedDataUri.match(/^data:[^;]+;base64,(.+)$/);
+          const buffer = Buffer.from(match![1], 'base64');
+          const file = await toFile(buffer, 'product.jpg', { type: 'image/jpeg' });
+          const uploaded = await runway.uploads.createEphemeral({ file });
+          imageUri = uploaded.uri;
+          console.log(`[RUNWAY] Image uploaded as ephemeral: ${imageUri}`);
+        }
+        payload.promptImage = [{ position: 'first', uri: imageUri }];
+        console.log(`[RUNWAY] Payload model: ${payload.model} | ratio: ${payload.ratio} | duration: ${payload.duration}`);
         const method = (runway as any).imageToVideo || runway.textToVideo;
         res = await (method as any).create(payload);
       } else {
@@ -322,7 +389,8 @@ async function generateVideoTask(
   if (task.status === 'SUCCEEDED') {
     return (task as any).output?.[0] || '';
   }
-  const failureReason = (task as any).failure || (task as any).failureCode || (task as any).error || 'Unknown error';
+  console.error('[RUNWAY] Task FAILED. Full task object:', JSON.stringify(task, null, 2));
+  const failureReason = (task as any).failure || (task as any).failureCode || (task as any).error || (task as any).failureMessage || 'Unknown error';
   const taskErr = new Error(`[Runway] Runway task failed (${task.status}): ${failureReason}`);
   (taskErr as any).apiSource = 'runway';
   throw taskErr;
@@ -363,8 +431,10 @@ async function generateKlingVideoTask(
   };
 
   if (promptImage) {
+    // Letterbox resize để ảnh fill đúng tỉ lệ khung trước khi gửi (giống Runway)
+    const resized = await resizeImageForRunway(promptImage, ratio);
     // Kling nhận pure base64, không nhận data URL prefix (data:image/...;base64,)
-    body.image = promptImage.includes('base64,') ? promptImage.split('base64,')[1] : promptImage;
+    body.image = resized.includes('base64,') ? resized.split('base64,')[1] : resized;
   }
 
   console.log(`[KLING] [TASK] Model: ${body.model} | I2V: ${!!promptImage} | Request Sent...`);
@@ -425,7 +495,7 @@ async function generateVeoVideoTask(
   //   veo-3.0-fast-generate-preview → "Veo 3 Fast Generate" (~15 credits/s)
   //   veo-3.0-generate-preview      → "Veo 3 Generate" (~40 credits/s, fallback)
   // NOTE: Cần Paid plan để dùng Veo (Free plan quota = 0)
-  const modelId = 'placeholder'; // bị override bởi VEO_MODELS bên dưới
+
 
   const body: any = {
     prompt: visualPrompt,
@@ -437,12 +507,12 @@ async function generateVeoVideoTask(
   };
 
   if (promptImage) {
-    const mimeMatch = promptImage.match(/^data:([^;]+);/);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    // Letterbox resize để ảnh fill đúng tỉ lệ khung trước khi gửi (giống Runway)
+    const resized = await resizeImageForRunway(promptImage, ratio);
     body.imageInput = {
       image: {
-        mimeType: mimeType,
-        data: promptImage.includes('base64,') ? promptImage.split('base64,')[1] : promptImage,
+        mimeType: 'image/jpeg',
+        data: resized.includes('base64,') ? resized.split('base64,')[1] : resized,
       }
     };
   }
@@ -535,7 +605,7 @@ export async function POST(req: Request) {
     const fptApiKey = req.headers.get('x-fpt-api-key');
     const klingAccessKey = req.headers.get('x-kling-access-key');
     const klingSecretKey = req.headers.get('x-kling-secret-key');
-    const hfApiKey = process.env.HUGGINGFACE_API_KEY;
+
 
     if (!googleApiKey) {
       throw new Error('[Gemini] Vui lòng cấu hình Google Gemini API Key trong phần Cài đặt.');
@@ -629,7 +699,15 @@ export async function POST(req: Request) {
     const characterId = config?.characterId || configData.characterId || '';
     const characterType = config?.characterType || configData.characterType || '';
     const mainCharacter = config?.mainCharacter || configData.mainCharacter || '';
-    const locationContext = config?.locationContext || configData.locationContext || 'A beautiful cinematic location';
+    const locationContextRaw = config?.locationContext || configData.locationContext || '';
+    const locationMap: Record<string, string> = {
+      'Tại cửa hàng': 'inside the store',
+      'Trung tâm thương mại': 'inside a shopping mall',
+      'Nhà bếp hiện đại': 'in a modern kitchen',
+      'Quầy thực phẩm': 'at a food counter',
+      'Ngoài trời / Đường phố': 'outdoor street setting',
+    };
+    const locationContext = locationMap[locationContextRaw] || locationContextRaw.replace(/[^\x00-\x7F]/g, '').trim() || 'a cinematic indoor setting';
 
     // --- SOURCE OF TRUTH: Lookup gender and English description from CHARACTERS constant ---
     const charDefinition = CHARACTERS.find((c: any) => c.id === characterId);
@@ -655,7 +733,7 @@ export async function POST(req: Request) {
         englishCharacterDesc = `${genderInEng} character`;
       }
     } else if (!englishCharacterDesc) {
-      englishCharacterDesc = `${genderInEng} character`;
+      englishCharacterDesc = `Vietnamese ${genderInEng.toLowerCase()} person with black hair and East Asian features`;
     }
 
     // --- DURATION LOGIC (STITCHING) ---
@@ -695,7 +773,6 @@ export async function POST(req: Request) {
 
     const actualTotalSeconds = clipsConfig.reduce((sum, c) => sum + c.duration, 0);
 
-    const projectTopic = script?.project?.storyTopic || script?.project?.title || 'Delicious Food';
     const motionIntensity = Number(config?.motionIntensity ?? 50);
     const motionKeyword = motionIntensity > 70 ? "Fluid cinematic motion" : "Stable shot, locked geometry";
     const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
@@ -739,60 +816,78 @@ export async function POST(req: Request) {
             ? `CONTINUITY: Identical food appearance and ${locationContext} setting as previous clip. Same character.`
             : `OPENING: Begin with extreme macro close-up of the food.`;
 
-        // === VISUAL PROMPT ===
-        // Priority: Food (70%+ screen time) > Location > Character (brief, secondary)
-        // Gen-4 Turbo I2V: interaction-based để spawn character vào không gian ảnh đồ ăn.
-        // Các model khác: labeled sections, food đứng đầu.
+        // === UNIVERSAL VIDEO NARRATIVE RULES ===
+        // Rule 1: Food opens the video and stays as hero throughout.
+        // Rule 2: Food must be 100% identical to reference at all times — no distortion, no added props.
+        // Rule 3: Camera pulls back to reveal Vietnamese character nearby (not touching food).
+        // Rule 4: Character smiles, speaks naturally, light body language — real 3D person, NOT a banner/cutout/statue.
+        // Rule 5: Background clearly depicts the chosen location setting.
         const style = config?.style || config?.activeStyle || 'cinematic';
         const isGen4Turbo = selectedModel === 'runway' && config?.runwayModel === 'gen4_turbo' && !!productImage;
+        const styleNote = `${style} food marketing style, 4K warm cinematic lighting. ${motionKeyword}.`;
+        const emotionNote = config?.emotion ? emotionToVisual(config.emotion) : '';
+        const toneNote = config?.tone ? toneToVisual(config.tone) : '';
+
+        // ai_character dùng 3D animated style — không dùng "realistic skin texture"
+        const isAiCharacter = characterId === 'ai_character';
+        const depthNote = isAiCharacter
+          ? 'Stylized 3D depth, expressive animated character design (Pixar/Disney style).'
+          : 'Full 3D depth, realistic skin texture.';
+
+        // FOOD PHASE nói rõ "macro close-up — character just outside frame" để giải thích
+        // tại sao character chưa thấy, tránh mâu thuẫn với "already present" trong REVEAL PHASE.
+        // Tránh "camera pulls back revealing" — video AI đọc là split/wipe/PiP transition.
+        const charReveal = `The camera angle widens naturally — ${englishCharacterDesc}, who has been standing just outside the initial tight frame, comes into view beside the food in ${locationContext}. Same continuous unbroken 3D scene, no cut, no transition. Character looks toward camera with a genuine warm smile, natural head nods and gentle hand gestures as if describing the food. Minimal physical contact with food. ${depthNote} Background shows ${locationContext}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a banner, NOT a cutout.`;
+
+        // Compact Vietnamese character desc cho gen4_turbo — đủ để Runway nhận diện đúng appearance
+        const roleMap: Record<string, string> = {
+          'male_chef':       'male chef in white chef uniform',
+          'lady_consultant': 'female consultant in professional attire',
+          'food_reviewer':   'young male food reviewer in casual outfit',
+          'female_vlogger':  'young female vlogger in casual outfit',
+          'friendly_owner':  'middle-aged male restaurant owner in casual clothes',
+          'mom_chef':        'motherly female in home attire',
+          'ai_character':    'cute 3D animated character',
+        };
+        const charRole = roleMap[characterId] || `${genderInEng.toLowerCase()} person`;
+        const compactVietnameseDesc = isAiCharacter
+          ? 'A cute 3D animated character (Pixar/Disney style)'
+          : `A Vietnamese ${charRole} with straight jet-black hair, dark brown eyes, and warm golden skin`;
 
         const visualPrompt = isGen4Turbo
             ? [
-                // Food hero trước, character xuất hiện thoáng qua ở rìa frame
-                `Cinematic macro close-up of the food from the reference image — the HERO of this video.`,
-                `Exact shape, texture, surface patterns, and color from the reference preserved with perfect fidelity.`,
-                `Only slow, smooth camera movements — zero morphing, zero shape distortion allowed.`,
-                `${englishCharacterDesc} briefly visible at frame edge as supporting context.`,
-                `Setting: ${locationContext}.`,
-                `${style} food marketing style, 4K lighting that enhances food texture. ${motionKeyword}.`,
-                config?.emotion ? emotionToVisual(config.emotion) : '',
-                config?.tone ? toneToVisual(config.tone) : '',
-                continuityNote
+                // Gen-4 Turbo I2V: reference image IS the first frame.
+                // ONE unified scene description — no temporal phases (Runway reads them as vertical spatial splits).
+                // "walks into" → entrance motion into the open upper area, not static placement.
+                `Cinematic food marketing video, single continuous shot, no cuts.`,
+                `The food from the reference image fills the foreground — preserve 100%: exact shape, embossed patterns, brand markings, color, pixel-identical throughout. Zero morphing, zero distortion.`,
+                `${compactVietnameseDesc} walks into the open upper portion of the frame from the side, settling behind the food display — waist-up, mid-distance from camera. Food stays closer and larger in frame. Character smiles warmly toward camera, lips moving as if speaking and introducing the food, gentle head nods and light hand gestures.`,
+                `Slow gentle camera drift. ${depthNote} ${locationContext}.`,
+                `NOT split screen, NOT picture-in-picture, NOT face close-up. One unified 3D scene.`,
+                styleNote, emotionNote, toneNote,
               ].filter(Boolean).join(' ')
             : productImage
               ? [
-                  // === I2V: ảnh mẫu là chuẩn tuyệt đối ===
-                  `SCENE: A ${c.duration}-second cinematic food marketing video. Food is the PRIMARY HERO.`,
-                  `FOOD (HERO SUBJECT): The food from the reference image dominates 70%+ of screen time. Ultra-sharp macro focus on every texture and detail.`,
-                  `SHAPE FIDELITY (CRITICAL): Reproduce the EXACT shape, surface texture, embossed patterns, and color from the reference image. ZERO morphing. ZERO shape distortion during any camera movement. Only minimal, slow camera motion is permitted to preserve the food's geometry.`,
-                  `CHARACTER (SECONDARY): ${englishCharacterDesc}. Brief appearance at frame edge or background only — supporting role, NOT the focus.`,
-                  `CHARACTER ACTION: ${combinedDesc.slice(0, 80)}.`,
-                  `LOCATION: ${locationContext}.`,
-                  `STYLE: ${style}, 4K lighting that makes the food irresistible. ${motionKeyword}.`,
-                  continuityNote,
-                  config?.emotion ? emotionToVisual(config.emotion) : '',
-                  config?.tone ? toneToVisual(config.tone) : '',
-                  config?.transitions === false ? `Single continuous shot, no cuts.` : ''
+                  `Single continuous cinematic shot, no cuts.`,
+                  `FOOD PHASE (first 50%): Macro/medium close-up of the food dominates screen time — character is just outside this tight frame. CRITICAL: preserve 100% exact shape, all surface patterns and embossed details, brand text, color tone — unchanged across every single frame. Only slow smooth camera motion. ZERO morphing, ZERO distortion, ZERO prop changes at any moment.`,
+                  `REVEAL PHASE (final 50%): ${charReveal}`,
+                  styleNote, continuityNote, emotionNote, toneNote,
+                  config?.transitions === false ? `No cuts.` : '',
                 ].filter(Boolean).join(' ')
               : [
-                  // === T2V: mô tả đồ ăn chi tiết nhất có thể ===
-                  `SCENE: A ${c.duration}-second cinematic food marketing video. Food is the PRIMARY HERO.`,
-                  `FOOD (HERO SUBJECT): ${combinedDesc.slice(0, 200)}. The food dominates 70%+ of screen time. Extreme macro close-up showcasing every appetizing detail.`,
-                  `FOOD APPEARANCE & STABILITY: Photorealistic food with perfectly consistent shape, color, and texture across ALL frames. NO morphing. NO shape changes. NO distortion from first to last frame.`,
-                  `CHARACTER (SECONDARY): ${englishCharacterDesc}. Brief appearance in background — supporting role only.`,
-                  `CHARACTER ACTION: ${combinedDesc.slice(200, 300)}.`,
-                  `LOCATION: ${locationContext}.`,
-                  `STYLE: ${style}, 4K lighting. ${motionKeyword}.`,
-                  continuityNote,
-                  config?.emotion ? emotionToVisual(config.emotion) : '',
-                  config?.tone ? toneToVisual(config.tone) : '',
-                  config?.transitions === false ? `Single continuous shot, no cuts.` : ''
+                  `Single continuous cinematic shot, no cuts.`,
+                  `FOOD PHASE (first 50%): ${combinedDesc.slice(0, 180)} opens the video in a macro close-up — character just outside this tight frame. Photorealistic rendering, perfectly consistent shape, color, and texture from first to last frame. ZERO morphing.`,
+                  `REVEAL PHASE (final 50%): ${charReveal}`,
+                  styleNote, continuityNote, emotionNote, toneNote,
+                  config?.transitions === false ? `No cuts.` : '',
                 ].filter(Boolean).join(' ');
 
-        // Runway API: giới hạn cứng 1000 ký tự cho promptText
-        // Veo / Kling: không có giới hạn này → cho phép tới 1500 ký tự
+        // Runway: hard cap 1000 chars. Kling/Veo: up to 1500 chars.
         const promptMaxLen = (selectedModel === 'kling' || selectedModel === 'veo') ? 1500 : 1000;
-        const finalVisualPrompt = visualPrompt.slice(0, promptMaxLen);
+        const rawPrompt = visualPrompt;
+        const finalVisualPrompt = rawPrompt.length <= promptMaxLen
+          ? rawPrompt
+          : (() => { const t = rawPrompt.slice(0, promptMaxLen - 3); const s = t.lastIndexOf('. '); return s > promptMaxLen * 0.7 ? rawPrompt.slice(0, s + 1) : t + '...'; })();
 
         if (selectedModel === 'kling') {
             return generateKlingVideoTask(generateKlingToken(klingAccessKey!, klingSecretKey!), finalVisualPrompt, ratio, c.duration, productImage);
