@@ -77,6 +77,6 @@ Mọi ý kiến phản hồi hoặc báo lỗi vui lòng mở Issue trên GitHub
 
 ## Giấy phép
 
-Copyright (c) 2025 BlankBire. All Rights Reserved.
+Copyright (c) 2026 BlankBire. All Rights Reserved.
 
 Phần mềm này là tài sản độc quyền của **BlankBire**. Mọi hành vi sao chép, phân phối, hay sử dụng thương mại đều bị nghiêm cấm nếu không có sự cho phép bằng văn bản từ tác giả. Xem chi tiết tại [LICENSE](LICENSE).
