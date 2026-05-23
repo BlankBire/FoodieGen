@@ -58,6 +58,7 @@ export default function Home() {
   const [rawScenes,      setRawScenes]      = useState<any[]>([])
   const [productImage,   setProductImage]   = useState<string | null>(null)
   const [suggestedPrompt,setSuggestedPrompt]= useState('')
+  const [fullAudioScript, setFullAudioScript] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
@@ -394,10 +395,6 @@ export default function Home() {
         // Compose format hiển thị từ dữ liệu có sẵn
         let displayParts: string[] = []
 
-        if (data.fullAudioScript) {
-          displayParts.push(`[LỜI THOẠI TOÀN BỘ VIDEO]\n${data.fullAudioScript}`)
-        }
-
         if (data.scenes && data.scenes.length > 0) {
           displayParts.push(`[CHI TIẾT PHÂN CẢNH]`)
           for (const scene of data.scenes) {
@@ -407,10 +404,15 @@ export default function Home() {
           }
         }
 
+        if (data.fullAudioScript) {
+          displayParts.push(`[LỜI THOẠI TOÀN BỘ VIDEO]\n${data.fullAudioScript}`)
+        }
+
         setScript(displayParts.join('\n\n'))
         if (data.scenes) {
           setRawScenes(data.scenes)
           setSuggestedPrompt(data.suggestedPrompt || buildSuggestedPrompt(data.scenes))
+          setFullAudioScript(data.fullAudioScript || data.scenes.map((s: any) => s.audioScript).filter(Boolean).join(' '))
         }
         if (data.scriptId) setScriptId(data.scriptId)
         if (data.projectId) setProjectId(data.projectId)
@@ -620,6 +622,7 @@ export default function Home() {
             model={model}
             isScriptDisabled={model === 'runway_ai' && runwayModelPref === 'gen4_turbo' && !productImage}
             suggestedPrompt={suggestedPrompt}
+            fullAudioScript={fullAudioScript}
           />
 
           <VisualAudioSection 

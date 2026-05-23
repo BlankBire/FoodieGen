@@ -42,9 +42,6 @@ async function resizeImageForRunway(base64DataUri: string, ratio: string = '720:
     return `data:image/jpeg;base64,${result.toString('base64')}`;
   }
 
-  // Image is shorter than target (e.g. square source in portrait frame) → mirror-fill top & bottom.
-  // Mirror-fill: Sharp reflects the image edges into the padding zones, producing sharp, natural-looking
-  // content that Runway reads as one continuous scene — no blur confusion, no empty zones.
   const padTotal = targetH - scaledH;
   const padTop = Math.floor(padTotal / 2);
   const padBottom = padTotal - padTop;
@@ -53,8 +50,10 @@ async function resizeImageForRunway(base64DataUri: string, ratio: string = '720:
     .resize(targetW, scaledH)
     .toBuffer();
 
+  // 'copy' repeats the outermost edge pixel row outward — clean ambient color band,
+  // no clone artifacts, no blur. Runway fills the neutral zone with location context when animating.
   const result = await sharp(scaledBuffer)
-    .extend({ top: padTop, bottom: padBottom, left: 0, right: 0, extendWith: 'mirror' })
+    .extend({ top: padTop, bottom: padBottom, left: 0, right: 0, extendWith: 'copy' })
     .jpeg({ quality: 88 })
     .toBuffer();
 

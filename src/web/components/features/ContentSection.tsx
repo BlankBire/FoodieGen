@@ -31,6 +31,7 @@ interface ContentSectionProps {
   videoScenes?: any[];
   isScriptDisabled?: boolean;
   suggestedPrompt?: string;
+  fullAudioScript?: string;
 }
 
 const PRESET_LOCATIONS = [
@@ -76,7 +77,8 @@ export const ContentSection = ({
   model,
   videoScenes = [],
   isScriptDisabled = false,
-  suggestedPrompt = ''
+  suggestedPrompt = '',
+  fullAudioScript = ''
 }: ContentSectionProps) => {
   // Location custom state
   const isCustomLoc = locationContext !== '' && !PRESET_LOCATIONS.includes(locationContext);
@@ -99,12 +101,21 @@ export const ContentSection = ({
   });
 
   const [copied, setCopied] = useState(false);
+  const [copiedAudio, setCopiedAudio] = useState(false);
 
   const handleCopyPrompt = () => {
     if (!suggestedPrompt) return;
     navigator.clipboard.writeText(suggestedPrompt).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleCopyAudio = () => {
+    if (!fullAudioScript) return;
+    navigator.clipboard.writeText(fullAudioScript).then(() => {
+      setCopiedAudio(true);
+      setTimeout(() => setCopiedAudio(false), 2000);
     });
   };
 
@@ -504,6 +515,57 @@ export const ContentSection = ({
               </div>
               <p style={{ fontSize: 11, color: suggestedPrompt.length > 1000 ? '#dc2626' : 'var(--text-muted)', margin: '6px 0 0', textAlign: 'right' }}>
                 Prompt: {suggestedPrompt.length} ký tự (giới hạn Runway: 1000)
+              </p>
+            </div>
+          )}
+
+          {/* Lời thoại — copy dán vào FPT.AI để đọc giọng */}
+          {!isManualMode && fullAudioScript && (
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div>
+                  <label className="form-label" style={{ marginBottom: 0, fontWeight: 700, color: '#b45309' }}>
+                    LỜI THOẠI
+                  </label>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Copy và dán vào <strong>console.fpt.ai</strong> để nghe thử giọng đọc.
+                  </p>
+                </div>
+                <button
+                  className="btn-icon-small"
+                  onClick={handleCopyAudio}
+                  style={copiedAudio ? {
+                    background: 'rgba(34,197,94,0.12)',
+                    color: '#16a34a',
+                    border: '1px solid rgba(34,197,94,0.3)',
+                    flexShrink: 0
+                  } : { flexShrink: 0 }}
+                >
+                  {copiedAudio ? (
+                    <><Check size={13} /> Đã copy</>
+                  ) : (
+                    <><FileText size={13} /> Copy</>
+                  )}
+                </button>
+              </div>
+              <div style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 10,
+                padding: '12px 14px',
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: 120,
+                overflowY: 'auto',
+              }}>
+                {fullAudioScript}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 0', textAlign: 'right' }}>
+                {fullAudioScript.length} ký tự
               </p>
             </div>
           )}
