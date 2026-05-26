@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       const ai = new GoogleGenAI({ apiKey: key });
       try {
         await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite-preview',
+          model: 'gemini-3.1-flash-lite',
           contents: [{ role: 'user', parts: [{ text: 'Hi' }] }]
         });
         return NextResponse.json({ success: true, message: 'Google Gemini API Key hợp lệ!' });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Eye, EyeOff, Save, CheckCircle2, Lock } from 'lucide-react';
+import { X, Settings, Eye, EyeOff, Save, CheckCircle2, Lock, KeyRound } from 'lucide-react';
 import { AIModelType } from '../../types';
 
 interface SettingsModalProps {
@@ -24,6 +24,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   
   const [isSaved, setIsSaved] = useState(false);
 
+  // Password gate
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [confirmInput, setConfirmInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const sha256 = async (text: string): Promise<string> => {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   // Determine which API keys are needed based on model
   const needsRunway = model === 'runway_manual' || model === 'runway_ai';
   const needsKling = model === 'kling_ai';
@@ -32,15 +45,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   // Load keys from localStorage on mount
   useEffect(() => {
     if (isOpen) {
-      setGoogleKey(localStorage.getItem('foodiegen_google_api_key') || '');
-      setRunwayKey(localStorage.getItem('foodiegen_runway_api_key') || '');
-      setFptKey(localStorage.getItem('foodiegen_fpt_api_key') || '');
-      setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
-      setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
-      setRunwayModel((localStorage.getItem('foodiegen_runway_model') as 'gen4.5' | 'gen4_turbo') || 'gen4_turbo');
+      const storedHash = localStorage.getItem('foodiegen_settings_password_hash');
+      const unlocked = localStorage.getItem('foodiegen_settings_unlocked') === 'true';
+      setIsFirstTime(!storedHash);
+      setIsUnlocked(unlocked);
+      setPasswordInput('');
+      setConfirmInput('');
+      setPasswordError('');
+
+      if (unlocked) {
+        setGoogleKey(localStorage.getItem('foodiegen_google_api_key') || '');
+        setRunwayKey(localStorage.getItem('foodiegen_runway_api_key') || '');
+        setFptKey(localStorage.getItem('foodiegen_fpt_api_key') || '');
+        setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
+        setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
+        setRunwayModel((localStorage.getItem('foodiegen_runway_model') as 'gen4.5' | 'gen4_turbo') || 'gen4_turbo');
+      }
       setIsSaved(false);
-      
-      // Ngăn chặn cuộn trang chính khi mở modal
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -50,6 +71,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
+
+  const loadKeys = () => {
+    setGoogleKey(localStorage.getItem('foodiegen_google_api_key') || '');
+    setRunwayKey(localStorage.getItem('foodiegen_runway_api_key') || '');
+    setFptKey(localStorage.getItem('foodiegen_fpt_api_key') || '');
+    setKlingAccessKey(localStorage.getItem('foodiegen_kling_access_key') || '');
+    setKlingSecretKey(localStorage.getItem('foodiegen_kling_secret_key') || '');
+    setRunwayModel((localStorage.getItem('foodiegen_runway_model') as 'gen4.5' | 'gen4_turbo') || 'gen4_turbo');
+  };
+
+  const handleVerifyPassword = async () => {
+    if (!passwordInput.trim()) return;
+    setIsVerifying(true);
+    setPasswordError('');
+    try {
+      const storedHash = localStorage.getItem('foodiegen_settings_password_hash');
+      const inputHash = await sha256(passwordInput);
+      if (inputHash === storedHash) {
+        localStorage.setItem('foodiegen_settings_unlocked', 'true');
+        setIsUnlocked(true);
+        loadKeys();
+      } else {
+        setPasswordError('Mật khẩu không đúng. Vui lòng thử lại.');
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleCreatePassword = async () => {
+    if (!passwordInput.trim()) return;
+    if (passwordInput.length < 6) {
+      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (passwordInput !== confirmInput) {
+      setPasswordError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    setIsVerifying(true);
+    try {
+      const hash = await sha256(passwordInput);
+      localStorage.setItem('foodiegen_settings_password_hash', hash);
+      setIsFirstTime(false);
+      setPasswordInput('');
+      setConfirmInput('');
+      setPasswordError('');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const [testingStatus, setTestingStatus] = useState<Record<string, 'testing' | 'success' | 'error' | null>>({});
   const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -121,6 +193,141 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   };
 
   if (!isOpen) return null;
+
+  const passwordGateStyle = {
+    overlay: {
+      position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 10000, animation: 'fadeIn 0.3s ease-out'
+    },
+    card: {
+      width: '100%', maxWidth: '380px',
+      background: 'var(--bg-surface)', borderRadius: '24px',
+      padding: '36px 32px', boxShadow: 'var(--shadow-card)',
+      border: '1px solid var(--border-default)',
+      display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '20px',
+      position: 'relative' as const,
+    },
+    icon: {
+      width: '56px', height: '56px',
+      background: 'var(--gradient-primary)', borderRadius: '16px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+    },
+    closeBtn: {
+      position: 'absolute' as const, top: '24px', right: '24px',
+      background: 'var(--bg-input)', border: 'none',
+      color: 'var(--text-muted)', cursor: 'pointer',
+      padding: '4px', borderRadius: '50%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: '28px', height: '28px'
+    },
+    input: (hasError: boolean) => ({
+      width: '100%', padding: '12px 16px', borderRadius: '12px',
+      border: `1px solid ${hasError ? '#ef4444' : 'var(--border-default)'}`,
+      background: 'var(--bg-input)', color: 'var(--text-primary)',
+      fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' as const
+    }),
+    submitBtn: (disabled: boolean) => ({
+      width: '100%', padding: '12px', borderRadius: '12px',
+      background: 'var(--gradient-primary)', color: 'white',
+      border: 'none', fontWeight: 700, fontSize: '0.95rem',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.6 : 1, transition: 'opacity 0.2s'
+    }),
+  };
+
+  const fadeStyle = (
+    <style jsx>{`
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `}</style>
+  );
+
+  if (!isUnlocked && isFirstTime) {
+    const disabled = isVerifying || !passwordInput.trim() || !confirmInput.trim();
+    return (
+      <div className="modal-overlay" style={passwordGateStyle.overlay}>
+        <div onClick={e => e.stopPropagation()} style={passwordGateStyle.card}>
+          <button onClick={onClose} style={passwordGateStyle.closeBtn}><X size={16} /></button>
+          <div style={passwordGateStyle.icon}><KeyRound size={26} /></div>
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 6px', color: 'var(--text-primary)' }}>
+              Tạo mật khẩu cài đặt
+            </h2>
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0 }}>
+              Tạo mật khẩu để bảo vệ cấu hình API. Mật khẩu lưu trên máy này.
+            </p>
+          </div>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <input
+              type="password"
+              autoFocus
+              value={passwordInput}
+              onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
+              placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)..."
+              style={passwordGateStyle.input(!!passwordError && !confirmInput)}
+            />
+            <input
+              type="password"
+              value={confirmInput}
+              onChange={e => { setConfirmInput(e.target.value); setPasswordError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreatePassword(); }}
+              placeholder="Xác nhận mật khẩu..."
+              style={passwordGateStyle.input(!!passwordError)}
+            />
+            {passwordError && (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#ef4444' }}>{passwordError}</p>
+            )}
+          </div>
+          <button onClick={handleCreatePassword} disabled={disabled} style={passwordGateStyle.submitBtn(disabled)}>
+            {isVerifying ? 'Đang tạo...' : 'Tạo mật khẩu'}
+          </button>
+        </div>
+        {fadeStyle}
+      </div>
+    );
+  }
+
+  if (!isUnlocked && !isFirstTime) {
+    const disabled = isVerifying || !passwordInput.trim();
+    return (
+      <div className="modal-overlay" style={passwordGateStyle.overlay}>
+        <div onClick={e => e.stopPropagation()} style={passwordGateStyle.card}>
+          <button onClick={onClose} style={passwordGateStyle.closeBtn}><X size={16} /></button>
+          <div style={passwordGateStyle.icon}><KeyRound size={26} /></div>
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 6px', color: 'var(--text-primary)' }}>
+              Xác thực để mở cài đặt
+            </h2>
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0 }}>
+              Nhập mật khẩu để truy cập cấu hình API
+            </p>
+          </div>
+          <div style={{ width: '100%' }}>
+            <input
+              type="password"
+              autoFocus
+              value={passwordInput}
+              onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') handleVerifyPassword(); }}
+              placeholder="Nhập mật khẩu..."
+              style={passwordGateStyle.input(!!passwordError)}
+            />
+            {passwordError && (
+              <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: '#ef4444' }}>{passwordError}</p>
+            )}
+          </div>
+          <button onClick={handleVerifyPassword} disabled={disabled} style={passwordGateStyle.submitBtn(disabled)}>
+            {isVerifying ? 'Đang xác thực...' : 'Xác nhận'}
+          </button>
+        </div>
+        {fadeStyle}
+      </div>
+    );
+  }
 
   const disabledInputStyle = {
     width: '100%',

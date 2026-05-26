@@ -37,42 +37,42 @@ export const CHARACTERS = [
     label: 'Nam đầu bếp tận tâm',
     gender: 'Nam',
     defaultDescription: 'Nam đầu bếp mặc đồng phục trắng sạch sẽ, mũ cao, tay nghề điêu luyện, gương mặt tập trung nhưng hiền hậu, đam mê nấu nướng và luôn chú trọng đến sự hoàn mỹ trong từng món ăn.',
-    englishDescription: 'A male chef with straight jet-black hair, dark brown almond-shaped eyes, smooth warm golden skin tone, and refined Southeast Asian facial bone structure. Wearing a clean white chef uniform and tall chef hat. Focused yet gentle expression.'
+    englishDescription: 'Handsome Vietnamese man in his late 20s, neat straight jet-black hair, bright expressive dark almond eyes, flawless clear golden skin, strong yet gentle Southeast Asian facial features with a defined clean jawline. Wearing a crisp white chef uniform and tall toque. Confident warm smile, photogenic and charismatic.'
   },
   {
     id: 'lady_consultant',
     label: 'Nữ nhân viên tư vấn sành điệu',
     gender: 'Nữ',
     defaultDescription: 'Nữ nhân viên tư vấn, trang phục chỉnh tề, nụ cười tỏa nắng, nhiệt tình giới thiệu các món đặc sản cho khách.',
-    englishDescription: 'A stylish female consultant with straight jet-black hair, dark brown almond-shaped eyes, smooth warm golden skin tone, and delicate Southeast Asian facial bone structure. Wearing elegant professional attire. Radiant welcoming smile.'
+    englishDescription: 'Beautiful Vietnamese woman in her mid-20s, glossy straight jet-black hair, large bright dark almond eyes with natural double eyelids, flawless luminous golden skin, delicate feminine Southeast Asian features with soft high cheekbones. Wearing elegant professional attire. Radiant charming smile, naturally photogenic and graceful.'
   },
   {
     id: 'food_reviewer',
     label: 'Food Reviewer năng động',
     gender: 'Nam',
     defaultDescription: 'Một Food Reviewer trẻ trung, cá tính, cách nói chuyện lôi cuốn, hài hước, gương mặt rạng rỡ khi thưởng thức món ăn và luôn tìm tòi những góc quay độc đáo.',
-    englishDescription: 'A dynamic young male food reviewer with short straight black hair, dark brown eyes, warm golden skin tone, and youthful Southeast Asian facial features. Wearing a casual energetic outfit. Vivid expressive reactions, charismatic and engaging personality.'
+    englishDescription: 'Handsome Vietnamese young man in his early 20s, short stylish straight black hair, bright lively dark eyes, smooth clear golden skin, youthful Southeast Asian features with defined cheekbones and a sharp clean jawline. Wearing a trendy casual outfit. Charismatic bright smile, naturally photogenic and full of energy.'
   },
   {
     id: 'female_vlogger',
     label: 'Bạn trẻ sành ăn (Vlogger)',
     gender: 'Nữ',
     defaultDescription: 'Bạn trẻ Gen Z sành điệu, phong cách năng động, thích khám phá các món ăn xu hướng, biểu cảm tự nhiên và lôi cuốn trước ống kính.',
-    englishDescription: 'A trendy Gen Z female vlogger with long straight jet-black hair, dark almond-shaped eyes, smooth warm skin tone, and youthful Southeast Asian facial features. Wearing modern casual fashion. Natural expressive captivating on-camera personality.'
+    englishDescription: 'Beautiful Vietnamese Gen Z woman in her early 20s, long silky straight jet-black hair, large bright almond-shaped dark eyes with natural lashes, flawless luminous golden skin, youthful Southeast Asian features with a soft round face and natural blush. Wearing trendy modern casual fashion. Natural charming smile, effortlessly photogenic and captivating on camera.'
   },
   {
     id: 'friendly_owner',
     label: 'Chủ quán hiếu khách',
     gender: 'Nam',
     defaultDescription: 'Chủ quán trung niên, gương mặt hiền hậu, hay cười, trang phục giảng dị, trực tiếp chuẩn bị món ăn với sự tận tâm như phục vụ người thân trong gia đình.',
-    englishDescription: 'A middle-aged male restaurant owner with black hair, dark kind eyes, warm medium skin tone, and approachable Southeast Asian facial features. Wearing simple casual clothing. Warm hospitable smile, family-style warmth.'
+    englishDescription: 'Friendly handsome Vietnamese man in his late 30s, short neatly combed black hair, warm bright dark eyes, clear golden skin, approachable photogenic Southeast Asian features with a trustworthy face. Wearing neat casual Vietnamese attire. Broad warm hospitable smile, naturally likable and wholesome.'
   },
   {
     id: 'mom_chef',
     label: 'Mẹ đảm đang nội trợ',
     gender: 'Nữ',
     defaultDescription: 'Người mẹ nội trợ dịu dàng, trang phục ở nhà gọn gàng, khéo léo chế biến những món ăn gia đình đầy yêu thương, gương mặt hạnh phúc.',
-    englishDescription: 'A motherly female figure with black hair tied neatly, gentle dark brown eyes, smooth warm skin tone, and soft Southeast Asian facial features. Wearing comfortable home attire. Loving and happy expression.'
+    englishDescription: 'Attractive Vietnamese woman in her late 30s, neat black hair tied back elegantly, gentle warm dark eyes, smooth clear golden skin, soft feminine Southeast Asian features with a loving maternal face. Wearing neat comfortable home attire. Bright loving smile, naturally beautiful and nurturing presence.'
   },
   { 
     id: 'ai_character', 

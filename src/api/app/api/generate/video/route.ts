@@ -25,35 +25,22 @@ async function resizeImageForRunway(base64DataUri: string, ratio: string = '720:
   const targetW = tw <= 1280 ? tw : 1280;
   const targetH = th <= 1280 ? th : 1280;
 
-  // Scale image so its width fills targetW, preserving aspect ratio (no crop horizontally)
+  // Cover crop: scale to fill the target completely, then center-crop the excess.
+  // Eliminates padding entirely — no blurry repeated-pixel bands at the frame edges.
+  // Food is typically centered in marketing photos so center crop preserves the subject.
   const meta = await sharp(buffer).metadata();
   const origW = meta.width || targetW;
   const origH = meta.height || targetH;
-  const scaledH = Math.round(origH * targetW / origW);
 
-  if (scaledH >= targetH) {
-    // Image is already taller than target after scaling → center crop vertically (no side padding needed)
-    const cropTop = Math.floor((scaledH - targetH) / 2);
-    const result = await sharp(buffer)
-      .resize(targetW, scaledH)
-      .extract({ left: 0, top: cropTop, width: targetW, height: targetH })
-      .jpeg({ quality: 88 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${result.toString('base64')}`;
-  }
+  const scale = Math.max(targetW / origW, targetH / origH);
+  const scaledW = Math.round(origW * scale);
+  const scaledH = Math.round(origH * scale);
+  const cropLeft = Math.floor((scaledW - targetW) / 2);
+  const cropTop  = Math.floor((scaledH - targetH) / 2);
 
-  const padTotal = targetH - scaledH;
-  const padTop = Math.floor(padTotal / 2);
-  const padBottom = padTotal - padTop;
-
-  const scaledBuffer = await sharp(buffer)
-    .resize(targetW, scaledH)
-    .toBuffer();
-
-  // 'copy' repeats the outermost edge pixel row outward — clean ambient color band,
-  // no clone artifacts, no blur. Runway fills the neutral zone with location context when animating.
-  const result = await sharp(scaledBuffer)
-    .extend({ top: padTop, bottom: padBottom, left: 0, right: 0, extendWith: 'copy' })
+  const result = await sharp(buffer)
+    .resize(scaledW, scaledH)
+    .extract({ left: cropLeft, top: cropTop, width: targetW, height: targetH })
     .jpeg({ quality: 88 })
     .toBuffer();
 
@@ -106,7 +93,7 @@ async function refineManualScript(rawText: string, apiKey: string, targetDuratio
   }
 
   const ai = new GoogleGenAI({ apiKey }); 
-  const modelId = 'gemini-3.1-flash-lite-preview'; 
+  const modelId = 'gemini-3.1-flash-lite'; 
   
   // Tính toán số từ cần thiết để đọc vừa với thời lượng (tốc độ đọc trung bình ~3.2 từ/giây)
   let durationSeconds = 10;
@@ -722,7 +709,7 @@ export async function POST(req: Request) {
         console.log(`[PIPELINE] Translating custom character description...`);
         const ai = new GoogleGenAI({ apiKey: googleApiKey });
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
+            model: 'gemini-3.1-flash-lite',
             contents: `Translate this Vietnamese character description to a concise English prompt for an AI video generator. Focus on visual appearance, clothing, and expression. Max 25 words. No explanations. Description: "${mainCharacter}"`,
         });
         englishCharacterDesc = response.text?.trim() || `${genderInEng} character`;
@@ -835,23 +822,27 @@ export async function POST(req: Request) {
 
         // FOOD PHASE nói rõ "macro close-up — character just outside frame" để giải thích
         // tại sao character chưa thấy, tránh mâu thuẫn với "already present" trong REVEAL PHASE.
-        // Tránh "camera pulls back revealing" — video AI đọc là split/wipe/PiP transition.
-        const charReveal = `The camera angle widens naturally — ${englishCharacterDesc}, who has been standing just outside the initial tight frame, comes into view beside the food in ${locationContext}. Same continuous unbroken 3D scene, no cut, no transition. Character looks toward camera with a genuine warm smile, natural head nods and gentle hand gestures as if describing the food. Minimal physical contact with food. ${depthNote} Background shows ${locationContext}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a banner, NOT a cutout.`;
+        // "pans to reveal open space" → works for both side-view and overhead food shots.
+        // Gender tag placed first so Runway parses it before the appearance description.
+        const genderTag = genderInEng ? `[${genderInEng.toUpperCase()} — ${genderInEng === 'Male' ? 'man, NOT a woman' : 'woman, NOT a man'}] ` : '';
+        const charReveal = `The camera pans smoothly to reveal open space beside the food — ${genderTag}${englishCharacterDesc} steps into that open space from the side, physically present in the same 3D scene, standing beside the food in ${locationContext}. Same continuous unbroken shot, no cut, no transition. Character faces camera with a genuine warm smile, natural head nods and gentle hand gestures as if speaking about the food. Minimal physical contact with food. ${depthNote} Background shows ${locationContext}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a sticker face overlay, NOT a floating head, NOT a banner, NOT a cutout.`;
 
-        // Compact Vietnamese character desc cho gen4_turbo — đủ để Runway nhận diện đúng appearance
+        // Compact Vietnamese character desc cho gen4_turbo — phải đủ signal chất lượng để Runway render đẹp
         const roleMap: Record<string, string> = {
-          'male_chef':       'male chef in white chef uniform',
-          'lady_consultant': 'female consultant in professional attire',
-          'food_reviewer':   'young male food reviewer in casual outfit',
-          'female_vlogger':  'young female vlogger in casual outfit',
-          'friendly_owner':  'middle-aged male restaurant owner in casual clothes',
-          'mom_chef':        'motherly female in home attire',
+          'male_chef':       'handsome male chef in his late 20s, wearing a crisp white chef uniform',
+          'lady_consultant': 'beautiful female consultant in her mid-20s, wearing elegant professional attire',
+          'food_reviewer':   'handsome young male food reviewer in his early 20s, wearing a trendy casual outfit',
+          'female_vlogger':  'beautiful young female vlogger in her early 20s, wearing modern casual fashion',
+          'friendly_owner':  'friendly handsome male restaurant owner in his late 30s, wearing neat casual attire',
+          'mom_chef':        'attractive motherly female in her late 30s, wearing neat comfortable home attire',
           'ai_character':    'cute 3D animated character',
         };
         const charRole = roleMap[characterId] || `${genderInEng.toLowerCase()} person`;
+        // Nam → tóc ngắn, nữ → tóc dài; thêm "photogenic" và "flawless skin" để Runway render chất lượng hơn
+        const hairDesc = genderInEng === 'Male' ? 'short neat straight jet-black hair' : 'long silky straight jet-black hair';
         const compactVietnameseDesc = isAiCharacter
           ? 'A cute 3D animated character (Pixar/Disney style)'
-          : `A Vietnamese ${charRole} with straight jet-black hair, dark brown eyes, and warm golden skin`;
+          : `${genderTag}A Vietnamese ${charRole}, ${hairDesc}, large bright dark eyes, flawless clear golden skin, photogenic Southeast Asian facial features`;
 
         const visualPrompt = isGen4Turbo
             ? [
@@ -994,8 +985,10 @@ export async function POST(req: Request) {
 
         // Bước cuối: Merge audio vào video
         // -movflags +faststart: đảm bảo moov atom ở đầu file → không bị corrupt khi phát
+        // apad=whole_dur: pad silence to at least (video+2)s so -shortest always stops at video end.
+        // Without explicit whole_dur, apad can loop audio when used with -c:v copy -shortest.
         const mergeCmd = fs.existsSync(audioFilePath)
-            ? `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart "${finalVideoPath}"`
+            ? `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad=whole_dur=${actualTotalSeconds + 2}[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart "${finalVideoPath}"`
             : `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -c:v copy -movflags +faststart "${finalVideoPath}"`;
             
         console.log(`[FFMPEG] Merging audio: ${fs.existsSync(audioFilePath) ? 'YES' : 'NO AUDIO'}`);

@@ -110,7 +110,7 @@ export async function POST(req: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
-    const modelId = "gemini-3.1-flash-lite-preview";
+    const modelId = "gemini-3.1-flash-lite";
 
     let promptParts: any[] = [];
 
@@ -142,11 +142,14 @@ export async function POST(req: Request) {
       durationNum = 75; // Trung bình 75s
     }
 
-    const voiceDuration = durationNum - 1; 
-    const maxWords = Math.floor(voiceDuration * 2.5);
+    // Buffer 2s cuối video để speech kết thúc tự nhiên ở giây 8-9 (không bị cắt giữa chừng)
+    const voiceDuration = durationNum - 2;
+    // FPT.AI đọc tiếng Việt ~3 từ/giây
+    const maxWords = Math.floor(voiceDuration * 3);
+    const minWords = Math.floor(voiceDuration * 2.5);
 
     console.log(
-      `[V8-DEBUG] Mode: ${isMarketingMode ? 'MARKETING' : 'CREATIVE'} | Target Video: ${durationNum}s | Max Words: ${maxWords}`,
+      `[V8-DEBUG] Mode: ${isMarketingMode ? 'MARKETING' : 'CREATIVE'} | Target Video: ${durationNum}s | Voice: ${voiceDuration}s | Words: ${minWords}–${maxWords}`,
     );
 
     // --- SAVE PRODUCT IMAGE IF EXISTS ---
@@ -250,7 +253,7 @@ Lời thoại (fullAudioScript) PHẢI tuân theo đúng 3 phần sau — đây 
 
   [PHẦN 3 - CALL TO ACTION] (~20% thời lượng): Kết thúc bằng lời kêu gọi hành động rõ ràng, ấm áp. Ví dụ: "Ghé ngay [Thương hiệu] hôm nay để cảm nhận!", "Đặt ngay trước khi hết!", "Chia sẻ ngay cho người thân yêu nhé!"
 
-- Tổng lời thoại: KHÔNG ngắn hơn 20 từ và không vượt quá ${maxWords} TỪ. Hoàn tất trong ${voiceDuration} giây đọc thong thả, truyền cảm.
+- Tổng lời thoại: từ ${minWords} đến ${maxWords} từ — khớp chính xác với ${voiceDuration} giây đọc của FPT.AI (tốc độ ~3.2 từ/giây). TUYỆT ĐỐI KHÔNG viết ngắn hơn ${minWords} từ.
 - Nhịp điệu: Có vần điệu, cảm xúc, tránh viết ngang. Nhấn mạnh THƯƠNG HIỆU một cách trang trọng, tự hào.
 
 QUY CÁCH TRẢ VỀ:
