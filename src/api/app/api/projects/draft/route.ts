@@ -10,6 +10,18 @@ export async function POST(req: Request) {
     // Dùng userId mặc định cho hệ thống chưa có Auth
     const defaultUserId = "123e4567-e89b-12d3-a456-426614174000";
 
+    // Đảm bảo user mặc định luôn tồn tại (xử lý fresh DB sau lần cài đặt mới)
+    await prisma.user.upsert({
+      where: { id: defaultUserId },
+      update: {},
+      create: {
+        id: defaultUserId,
+        email: "default@foodiegen.local",
+        fullName: "FoodieGen User",
+        passwordHash: "",
+      },
+    });
+
     // 1. Tìm hoặc Tạo Project — dùng upsert để xử lý projectId lỗi thời (đã bị xóa)
     let project;
     if (projectId) {

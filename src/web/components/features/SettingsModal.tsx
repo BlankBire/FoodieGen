@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings, Eye, EyeOff, Save, CheckCircle2, Lock, KeyRound } from 'lucide-react';
 import { AIModelType } from '../../types';
+import { VALID_TOKEN_HASHES } from '../../lib/access-tokens';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,11 +25,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   
   const [isSaved, setIsSaved] = useState(false);
 
-  // Password gate
+  // Token gate
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [isFirstTime, setIsFirstTime] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
-  const [confirmInput, setConfirmInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -45,12 +44,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
   // Load keys from localStorage on mount
   useEffect(() => {
     if (isOpen) {
-      const storedHash = localStorage.getItem('foodiegen_settings_password_hash');
       const unlocked = localStorage.getItem('foodiegen_settings_unlocked') === 'true';
-      setIsFirstTime(!storedHash);
       setIsUnlocked(unlocked);
       setPasswordInput('');
-      setConfirmInput('');
       setPasswordError('');
 
       if (unlocked) {
@@ -86,38 +82,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     setIsVerifying(true);
     setPasswordError('');
     try {
-      const storedHash = localStorage.getItem('foodiegen_settings_password_hash');
       const inputHash = await sha256(passwordInput);
-      if (inputHash === storedHash) {
+      if (VALID_TOKEN_HASHES.includes(inputHash)) {
         localStorage.setItem('foodiegen_settings_unlocked', 'true');
         setIsUnlocked(true);
         loadKeys();
       } else {
-        setPasswordError('Mật khẩu không đúng. Vui lòng thử lại.');
+        setPasswordError('Token không hợp lệ. Vui lòng kiểm tra lại.');
       }
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleCreatePassword = async () => {
-    if (!passwordInput.trim()) return;
-    if (passwordInput.length < 6) {
-      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự.');
-      return;
-    }
-    if (passwordInput !== confirmInput) {
-      setPasswordError('Mật khẩu xác nhận không khớp.');
-      return;
-    }
-    setIsVerifying(true);
-    try {
-      const hash = await sha256(passwordInput);
-      localStorage.setItem('foodiegen_settings_password_hash', hash);
-      setIsFirstTime(false);
-      setPasswordInput('');
-      setConfirmInput('');
-      setPasswordError('');
     } finally {
       setIsVerifying(false);
     }
@@ -246,52 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     `}</style>
   );
 
-  if (!isUnlocked && isFirstTime) {
-    const disabled = isVerifying || !passwordInput.trim() || !confirmInput.trim();
-    return (
-      <div className="modal-overlay" style={passwordGateStyle.overlay}>
-        <div onClick={e => e.stopPropagation()} style={passwordGateStyle.card}>
-          <button onClick={onClose} style={passwordGateStyle.closeBtn}><X size={16} /></button>
-          <div style={passwordGateStyle.icon}><KeyRound size={26} /></div>
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 6px', color: 'var(--text-primary)' }}>
-              Tạo mật khẩu cài đặt
-            </h2>
-            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0 }}>
-              Tạo mật khẩu để bảo vệ cấu hình API. Mật khẩu lưu trên máy này.
-            </p>
-          </div>
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <input
-              type="password"
-              autoFocus
-              value={passwordInput}
-              onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
-              placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)..."
-              style={passwordGateStyle.input(!!passwordError && !confirmInput)}
-            />
-            <input
-              type="password"
-              value={confirmInput}
-              onChange={e => { setConfirmInput(e.target.value); setPasswordError(''); }}
-              onKeyDown={e => { if (e.key === 'Enter') handleCreatePassword(); }}
-              placeholder="Xác nhận mật khẩu..."
-              style={passwordGateStyle.input(!!passwordError)}
-            />
-            {passwordError && (
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#ef4444' }}>{passwordError}</p>
-            )}
-          </div>
-          <button onClick={handleCreatePassword} disabled={disabled} style={passwordGateStyle.submitBtn(disabled)}>
-            {isVerifying ? 'Đang tạo...' : 'Tạo mật khẩu'}
-          </button>
-        </div>
-        {fadeStyle}
-      </div>
-    );
-  }
-
-  if (!isUnlocked && !isFirstTime) {
+  if (!isUnlocked) {
     const disabled = isVerifying || !passwordInput.trim();
     return (
       <div className="modal-overlay" style={passwordGateStyle.overlay}>
@@ -300,10 +227,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
           <div style={passwordGateStyle.icon}><KeyRound size={26} /></div>
           <div style={{ textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 6px', color: 'var(--text-primary)' }}>
-              Xác thực để mở cài đặt
+              Nhập token truy cập
             </h2>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0 }}>
-              Nhập mật khẩu để truy cập cấu hình API
+              Nhập token được cung cấp để mở cài đặt API
             </p>
           </div>
           <div style={{ width: '100%' }}>
@@ -313,7 +240,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
               value={passwordInput}
               onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
               onKeyDown={e => { if (e.key === 'Enter') handleVerifyPassword(); }}
-              placeholder="Nhập mật khẩu..."
+              placeholder="Nhập token truy cập..."
               style={passwordGateStyle.input(!!passwordError)}
             />
             {passwordError && (

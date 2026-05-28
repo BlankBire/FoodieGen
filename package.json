@@ -87,6 +87,9 @@
     "win": {
       "target": "nsis",
       "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "include": "build/installer.nsh"
     }
   },
   "packageManager": "npm@10.9.2",

@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Copy, CheckCheck, TriangleAlert } from 'lucide-react';
 import { VISUAL_STYLES, VOICES } from '../../constants';
 
 interface VideoSceneData {
@@ -28,6 +29,8 @@ interface PreviewPanelProps {
 export const PreviewPanel = ({ scenes, productImage, setProductImage, config, onReset, onDownload }: PreviewPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentIdx, setCurrentIdx] = React.useState(0);
+  const [imageRatioWarning, setImageRatioWarning] = React.useState(false);
+  const [promptCopied, setPromptCopied] = React.useState(false);
   
   // Find the label for the active style
   const styleLabel = VISUAL_STYLES.find(s => s.id === config.activeStyle)?.label || config.activeStyle;
@@ -51,15 +54,40 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
     }
   };
 
+  const getChatGptPrompt = () => {
+    const ratioLabel = config.aspectRatio === '9:16' ? '9:16 (dọc/portrait)' : config.aspectRatio === '16:9' ? '16:9 (ngang/landscape)' : config.aspectRatio;
+    return `Tôi có một ảnh chụp món ăn nhưng kích thước chưa phù hợp với video short/reel. Hãy giúp tôi tạo lại ảnh theo tỉ lệ ${ratioLabel} với các yêu cầu sau:\n\n1. Tạo thêm vùng không gian tự nhiên bên cạnh món ăn để có thể đặt nhân vật người đứng vào — vùng này phải trông như một phần không gian thực sự của bức ảnh gốc, không bị cắt ghép lộ liễu\n2. Giữ nguyên màu sắc, ánh sáng và phong cách nhiếp ảnh của ảnh gốc\n3. Kết quả phải sắc nét, chuyên nghiệp, phù hợp làm video marketing thực phẩm\n\nẢnh gốc tôi đính kèm bên dưới.`;
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProductImage(reader.result as string);
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      setProductImage(dataUrl);
+      // Kiểm tra tỉ lệ ảnh so với video
+      const img = new window.Image();
+      img.onload = () => {
+        const isPortraitVideo = config.aspectRatio === '9:16';
+        const isLandscapeVideo = config.aspectRatio === '16:9';
+        const imgPortrait = img.naturalHeight > img.naturalWidth;
+        const imgLandscape = img.naturalWidth > img.naturalHeight;
+        const mismatch =
+          (isPortraitVideo && !imgPortrait) ||
+          (isLandscapeVideo && !imgLandscape);
+        setImageRatioWarning(mismatch);
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(getChatGptPrompt()).then(() => {
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    });
   };
 
   const currentScene = scenes && scenes.length > 0 ? scenes[currentIdx] : null;
@@ -160,7 +188,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
                     justifyContent: 'center',
                     fontWeight: 'bold'
                   }} 
-                  onClick={(e) => { e.stopPropagation(); setProductImage(null); }}
+                  onClick={(e) => { e.stopPropagation(); setProductImage(null); setImageRatioWarning(false); }}
                 >
                   ×
                 </div>
@@ -185,6 +213,26 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
             <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', lineHeight: 1.5 }}>
               Gen-4 Turbo chỉ hỗ trợ Image-to-Video. Tải ảnh lên để Gemini đọc thông tin thương hiệu và tạo kịch bản chính xác.
             </p>
+          )}
+          {imageRatioWarning && productImage && (
+            <div style={{ marginTop: 10, borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.07)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                <TriangleAlert size={14} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  Ảnh không phù hợp với tỉ lệ <strong style={{ color: '#f59e0b' }}>{config.aspectRatio}</strong>. Dùng ChatGPT để tạo lại ảnh đúng kích thước và có thêm không gian cho nhân vật — tỉ lệ thành công sẽ cao hơn nhiều.
+                </p>
+              </div>
+              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 7, padding: '8px 10px', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {getChatGptPrompt()}
+              </div>
+              <button
+                onClick={handleCopyPrompt}
+                style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: `1px solid ${promptCopied ? 'rgba(34,197,94,0.4)' : 'rgba(245,158,11,0.4)'}`, background: promptCopied ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.12)', color: promptCopied ? 'var(--text-success, #16a34a)' : 'var(--text-accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                {promptCopied ? <CheckCheck size={13} /> : <Copy size={13} />}
+                {promptCopied ? 'Đã sao chép!' : 'Sao chép prompt'}
+              </button>
+            </div>
           )}
         </div>
 

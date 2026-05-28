@@ -98,37 +98,17 @@ export default function Home() {
   }, [isReadingMode])
 
   useEffect(() => {
+    // Nếu thiết bị chưa unlock token, xóa mọi API key để không thể bypass token gate
+    if (localStorage.getItem('foodiegen_settings_unlocked') !== 'true') {
+      localStorage.removeItem('foodiegen_google_api_key')
+      localStorage.removeItem('foodiegen_runway_api_key')
+      localStorage.removeItem('foodiegen_fpt_api_key')
+      localStorage.removeItem('foodiegen_kling_access_key')
+      localStorage.removeItem('foodiegen_kling_secret_key')
+    }
+
     fetchDraftCount()
     setRunwayModelPref(localStorage.getItem('foodiegen_runway_model') || 'gen4_turbo')
-    const saved = localStorage.getItem('foodiegen_draft')
-    if (saved) {
-      try {
-        const d = JSON.parse(saved)
-        if (d.resolution) setResolution(d.resolution)
-        if (d.aspectRatio) setAspectRatio(d.aspectRatio)
-        if (d.duration) setDuration(d.duration)
-        if (d.model) setModel(d.model)
-        if (d.activeStyle) setActiveStyle(d.activeStyle)
-        if (d.activeTone) setActiveTone(d.activeTone)
-        if (d.emotion) setEmotion(d.emotion)
-        if (d.motionIntensity) setMotionIntensity(d.motionIntensity)
-        if (d.transitions !== undefined) setTransitions(d.transitions)
-        if (d.charConsistency !== undefined) setCharConsistency(d.charConsistency)
-        if (d.voiceGender) setVoiceGender(d.voiceGender)
-        if (d.language) setLanguage(d.language)
-        if (d.voiceSpeed) setVoiceSpeed(d.voiceSpeed)
-        if (d.voiceOver !== undefined) setVoiceOver(d.voiceOver)
-        if (d.bgMusic !== undefined) setBgMusic(d.bgMusic)
-        if (d.foodTopic) setFoodTopic(d.foodTopic)
-        if (d.characterType) setCharacterType(d.characterType)
-        if (d.locationContext) setLocationContext(d.locationContext)
-        if (d.mainCharacter) setMainCharacter(d.mainCharacter)
-        if (d.videoGenre) setVideoGenre(d.videoGenre)
-        if (d.script) setScript(d.script)
-        if (d.videoScenes) setVideoScenes(d.videoScenes)
-        if (d.productImage) setProductImage(d.productImage)
-      } catch (e) {}
-    }
   }, [])
 
   // Synchronize duration and number of scenes based on user request
@@ -217,7 +197,6 @@ export default function Home() {
     setProjectId('')
     setScriptId('')
     
-    localStorage.removeItem('foodiegen_draft')
     showToast('Đã làm mới toàn bộ cài đặt.')
   }
 
@@ -303,15 +282,13 @@ export default function Home() {
       setStatus('Đang lưu bản nháp...')
       
       const payload = {
-        projectId: projectId || undefined,
-        scriptId: scriptId || undefined,
         topic: foodTopic || 'Kịch bản chưa đặt tên',
         scenes: videoScenes || [],
         config: {
           resolution, aspectRatio, duration, model, activeStyle, activeTone,
           emotion, motionIntensity, transitions, charConsistency,
           voiceGender, language, voiceSpeed, voiceOver, bgMusic,
-          characterId, characterType, locationContext, mainCharacter, numScenes, 
+          characterId, characterType, locationContext, mainCharacter, numScenes,
           script, foodTopic, videoGenre, productImage, videoUrl, audioUrl
         }
       }
@@ -322,17 +299,8 @@ export default function Home() {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      
+
       if (data.success) {
-        setProjectId(data.projectId)
-        setScriptId(data.scriptId)
-        localStorage.setItem('foodiegen_draft', JSON.stringify({
-          resolution, aspectRatio, duration, model, activeStyle, activeTone,
-          emotion, motionIntensity, transitions, charConsistency,
-          voiceGender, language, voiceSpeed, voiceOver, bgMusic,
-          foodTopic, characterType, locationContext, mainCharacter, videoGenre,
-          script, videoScenes, productImage
-        }))
         fetchDraftCount()
         showToast('Đã lưu kịch bản vào bộ nhớ tạm thời.')
         setStatus('Đã lưu nháp.')
