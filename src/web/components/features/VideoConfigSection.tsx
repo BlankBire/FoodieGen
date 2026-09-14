@@ -64,12 +64,10 @@ export const VideoConfigSection = ({
   model, setModel,
   runwayModelPref = 'gen4_turbo'
 }: VideoConfigSectionProps) => {
-  // Check if current duration is a custom value
   const isCustomDuration = !PRESET_DURATIONS.some(d => d.value === duration);
   const [selectedDurOption, setSelectedDurOption] = useState(isCustomDuration ? 'custom' : duration);
   const [customSeconds, setCustomSeconds] = useState(() => {
     if (isCustomDuration) {
-      // Parse "custom:XX" format
       const match = duration.match(/^custom:(\d+)$/);
       return match ? match[1] : '';
     }
@@ -79,7 +77,6 @@ export const VideoConfigSection = ({
   useEffect(() => {
     const isCustom = !PRESET_DURATIONS.some(d => d.value === duration);
     setSelectedDurOption(prev => {
-      // Stay in custom mode if user just switched and hasn't typed yet
       if (prev === 'custom' && !isCustom) return 'custom';
       return isCustom ? 'custom' : duration;
     });
@@ -94,7 +91,6 @@ export const VideoConfigSection = ({
     if (val !== 'custom') {
       setDuration(val as DurationType);
     }
-    // Don't set duration when switching to custom — wait for user input
   };
 
   const handleCustomSecondsChange = (e: React.ChangeEvent<HTMLInputElement>) => {

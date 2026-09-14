@@ -1,8 +1,3 @@
-/* 
-  DATABASE TYPES FOR FOODIEGEN 
-  Synchronized with database/schema.sql
-*/
-
 export type EntityType = 'CHARACTER' | 'FOOD' | 'LOCATION';
 export type ProjectStatus = 'draft' | 'generating' | 'completed' | 'failed';
 export type GenerationStatus = 'pending' | 'processing' | 'completed' | 'failed';

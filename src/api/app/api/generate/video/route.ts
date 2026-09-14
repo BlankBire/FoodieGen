@@ -76,12 +76,7 @@ function toneToVisual(tone: string): string {
   return map[tone] || `Visual presentation should reflect a ${tone} tone throughout.`;
 }
 
-/**
- * Sử dụng Gemini (@google/genai) để "thông não" kịch bản thô.
- * Chuyển sang v1 để tránh lỗi 404 v1beta.
- */
 async function refineManualScript(rawText: string, apiKey: string, targetDuration: string = '10s', emotion?: string, style?: string, tone?: string) {
-  // --- TỐI ƯU HÓA: Bỏ qua Gemini nếu rawText đã là JSON hợp lệ ---
   try {
     const parsed = JSON.parse(rawText);
     if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].sceneOrder) {
@@ -89,13 +84,12 @@ async function refineManualScript(rawText: string, apiKey: string, targetDuratio
       return parsed;
     }
   } catch (e) {
-    // Không phải JSON, tiếp tục gọi Gemini
+    // Not JSON, proceed to refine
   }
 
   const ai = new GoogleGenAI({ apiKey }); 
   const modelId = 'gemini-3.1-flash-lite'; 
   
-  // Tính toán số từ cần thiết để đọc vừa với thời lượng (tốc độ đọc trung bình ~3.2 từ/giây)
   let durationSeconds = 10;
   if (targetDuration.startsWith('custom:')) {
     durationSeconds = parseInt(targetDuration.split(':')[1]) || 10;
@@ -219,10 +213,9 @@ async function generateAudioTask(
       console.log(`[FPT-AI] [POLLING] Async URL: ${asyncUrl}`);
       let audioBuffer: Buffer | null = null;
       
-      // Đợi lâu hơn trước poll đầu tiên để FPT có thời gian xử lý
       await new Promise(r => setTimeout(r, 6000));
 
-      const maxPolls = 30; // 30 polls × 3s = 90s
+      const maxPolls = 30; 
       for (let i = 0; i < maxPolls; i++) {
         try {
           const checkRes = await fetch(asyncUrl);
@@ -245,12 +238,10 @@ async function generateAudioTask(
       
       if (!audioBuffer) {
         console.warn(`[FPT-AI] [POLL-TIMEOUT] Attempt ${attempt}: Async URL never resolved. ${attempt < MAX_API_RETRIES ? 'Retrying with new API call...' : 'Giving up.'}`);
-        // Đợi 2s trước khi retry API call mới
         if (attempt < MAX_API_RETRIES) await new Promise(r => setTimeout(r, 2000));
-        continue; // Retry toàn bộ FPT API call
+        continue; 
       }
       
-      // === THÀNH CÔNG - Lưu file ===
       const rawAudioPath = path.join(audioDir, `raw_fpt_${finalScriptId}.mp3`);
       fs.writeFileSync(rawAudioPath, audioBuffer);
       console.log(`[FPT-AI] [SAVED] Raw audio: ${rawAudioPath}`);
@@ -331,7 +322,6 @@ async function generateVideoTask(
         const method = (runway as any).imageToVideo || runway.textToVideo;
         res = await (method as any).create(payload);
       } else {
-        // Không có ảnh → gen4.5 (T2V)
         res = await (runway.textToVideo as any).create(payload);
       }
       
@@ -347,13 +337,13 @@ async function generateVideoTask(
 
   let task = await runway.tasks.retrieve(res.id);
   let pollErrorCount = 0;
-  const MAX_POLL_ERRORS = 15; // Giới hạn 15 lần lỗi liên tiếp (chịu đựng mất kết nối khoảng 1.5 phút)
+  const MAX_POLL_ERRORS = 15; 
 
   while (task.status !== 'SUCCEEDED' && task.status !== 'FAILED') {
-    await new Promise(r => setTimeout(r, 5000)); // Optimized to 5s
+    await new Promise(r => setTimeout(r, 5000)); 
     try {
       task = await runway.tasks.retrieve(res.id);
-      pollErrorCount = 0; // Gọi thành công -> reset bộ đếm
+      pollErrorCount = 0; 
     } catch (pollErr: any) {
       pollErrorCount++;
       console.warn(`[RUNWAY] Poll error for task ${res.id} (Count: ${pollErrorCount}/${MAX_POLL_ERRORS}):`, pollErr.message);
@@ -364,7 +354,6 @@ async function generateVideoTask(
         throw finalErr;
       }
 
-      // Bỏ qua lỗi timeout (Request timed out) hoặc lỗi server từ Runway để không làm crash pipeline
       if (pollErr.message?.toLowerCase().includes('timeout') || pollErr.status >= 500 || pollErr.status === 429) {
         continue;
       }
@@ -382,9 +371,6 @@ async function generateVideoTask(
   throw taskErr;
 }
 
-/**
- * Tạo JWT Token cho Kling AI
- */
 function generateKlingToken(accessKey: string, secretKey: string) {
   const payload = {
     iss: accessKey,
@@ -394,9 +380,6 @@ function generateKlingToken(accessKey: string, secretKey: string) {
   return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
 }
 
-/**
- * Xử lý tạo video bằng Kling AI (T2V & I2V)
- */
 async function generateKlingVideoTask(
   token: string,
   visualPrompt: string,
@@ -409,17 +392,15 @@ async function generateKlingVideoTask(
     : 'https://api.klingai.com/v1/videos/text2video';
 
   const body: any = {
-    model: 'kling-v3', // Sử dụng model v3 mới nhất
+    model: 'kling-v3', 
     prompt: visualPrompt,
     aspect_ratio: ratio === '1280:720' ? '16:9' : '9:16',
     duration: duration === 5 ? '5' : '10',
-    mode: 'std', // Mặc định chế độ cân bằng như yêu cầu
+    mode: 'std', 
   };
 
   if (promptImage) {
-    // Letterbox resize để ảnh fill đúng tỉ lệ khung trước khi gửi (giống Runway)
     const resized = await resizeImageForRunway(promptImage, ratio);
-    // Kling nhận pure base64, không nhận data URL prefix (data:image/...;base64,)
     body.image = resized.includes('base64,') ? resized.split('base64,')[1] : resized;
   }
 
@@ -439,12 +420,11 @@ async function generateKlingVideoTask(
 
   const taskId = data.data.task_id;
   
-  // Polling trạng thái task
   let taskStatus = 'QUEUED';
   let videoUrl = '';
   let attempts = 0;
 
-  while (attempts < 60) { // Tối đa 5 phút (60 * 5s)
+  while (attempts < 60) { 
     await new Promise(r => setTimeout(r, 5000));
     const statusResp = await fetch(`https://api.klingai.com/v1/videos/tasks/${taskId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -467,9 +447,6 @@ async function generateKlingVideoTask(
   return videoUrl;
 }
 
-/**
- * Xử lý tạo video bằng Google Veo 3.1 Fast (T2V & I2V)
- */
 async function generateVeoVideoTask(
   apiKey: string,
   visualPrompt: string,
@@ -477,23 +454,15 @@ async function generateVeoVideoTask(
   duration: number,
   promptImage?: string
 ) {
-  // Veo models theo đúng tên Google AI Studio:
-  //   veo-3.0-fast-generate-preview → "Veo 3 Fast Generate" (~15 credits/s)
-  //   veo-3.0-generate-preview      → "Veo 3 Generate" (~40 credits/s, fallback)
-  // NOTE: Cần Paid plan để dùng Veo (Free plan quota = 0)
-
-
   const body: any = {
     prompt: visualPrompt,
     videoConfig: {
       durationSeconds: duration,
       aspectRatio: ratio === '1280:720' ? '16:9' : '9:16',
-      // generateAudio không được hỗ trợ ở model fast → bỏ qua, FPT.ai xử lý voice
     }
   };
 
   if (promptImage) {
-    // Letterbox resize để ảnh fill đúng tỉ lệ khung trước khi gửi (giống Runway)
     const resized = await resizeImageForRunway(promptImage, ratio);
     body.imageInput = {
       image: {
@@ -503,7 +472,6 @@ async function generateVeoVideoTask(
     };
   }
 
-  // Model fallback: Veo 3 Fast → Veo 3 Standard nếu fast chưa khả dụng
   const VEO_MODELS = ['veo-3.0-fast-generate-preview', 'veo-3.0-generate-preview'];
   let videoUrl = '';
   let lastVeoErr: any = null;
@@ -519,7 +487,6 @@ async function generateVeoVideoTask(
         body: JSON.stringify(body)
       });
 
-      // Đọc text trước để tránh crash nếu body rỗng hoặc không phải JSON
       const rawText = await resp.text();
       if (!rawText) {
         throw new Error(`[Veo] Empty response from API (HTTP ${resp.status}) for model ${modelId}`);
@@ -531,7 +498,6 @@ async function generateVeoVideoTask(
 
       if (data.error) {
         const msg = data.error.message || JSON.stringify(data.error);
-        // Nếu lỗi do model không tồn tại → thử model fallback tiếp theo
         if (resp.status === 404 || msg.includes('not found') || msg.includes('not supported')) {
           console.warn(`[VEO] Model ${modelId} unavailable, trying fallback...`);
           lastVeoErr = new Error(`[Veo] ${msg}`);
@@ -561,12 +527,12 @@ async function generateVeoVideoTask(
         attempts++;
       }
 
-      if (videoUrl) break; // thành công, thoát vòng lặp model
+      if (videoUrl) break; 
       lastVeoErr = new Error(`[Veo] Video generation timed out for model ${modelId}`);
     } catch (e: any) {
       if ((e.message || '').includes('fallback') || lastVeoErr) {
         lastVeoErr = e;
-        continue; // thử model tiếp theo
+        continue; 
       }
       (e as any).apiSource = 'veo';
       throw e;
@@ -621,11 +587,9 @@ export async function POST(req: Request) {
     let scenes: any[] = [];
     let fullAudioScript = '';
     const defaultProjectId = '123e4567-e89b-12d3-a456-426614174000';
-    
-    // --- DURATION LOGIC (STITCHING) - Moved up ---
+
     const durationStr = String(config?.duration || '10s');
 
-    // Convert to human-readable for Gemini prompt
     const humanDuration = (() => {
       const cm = durationStr.match(/^custom:(\d+)$/);
       if (cm) return `${cm[1]} giây`;
@@ -673,7 +637,6 @@ export async function POST(req: Request) {
     if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
     if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
 
-    // --- PREPARE DATA ---
     const totalAudioScript = (fullAudioScript && fullAudioScript.trim()) 
       ? fullAudioScript 
       : scenes.map((s: any) => s.audioScript).filter(Boolean).join('... ');
@@ -695,15 +658,12 @@ export async function POST(req: Request) {
     };
     const locationContext = locationMap[locationContextRaw] || locationContextRaw.replace(/[^\x00-\x7F]/g, '').trim() || 'a cinematic indoor setting';
 
-    // --- SOURCE OF TRUTH: Lookup gender and English description from CHARACTERS constant ---
     const charDefinition = CHARACTERS.find((c: any) => c.id === characterId);
     const resolvedGender = charDefinition?.gender || characterType; 
     const genderInEng = resolvedGender === 'Nam' ? 'Male' : (resolvedGender === 'Nữ' ? 'Female' : '');
     
-    // Ưu tiên dùng mô tả tiếng Anh để AI (Runway/Kling) hiểu chính xác nhân vật
     let englishCharacterDesc = charDefinition?.englishDescription || "";
 
-    // Dịch tự động nhân vật tùy chỉnh sang tiếng Anh
     if (!englishCharacterDesc && mainCharacter && googleApiKey) {
       try {
         console.log(`[PIPELINE] Translating custom character description...`);
@@ -722,9 +682,7 @@ export async function POST(req: Request) {
       englishCharacterDesc = `Vietnamese ${genderInEng.toLowerCase()} person with black hair and East Asian features`;
     }
 
-    // --- DURATION LOGIC (STITCHING) ---
     let totalSeconds = 10;
-    // Support custom:XX format from frontend
     const customMatch = durationStr.match(/^custom:(\d+)$/);
     if (customMatch) {
       totalSeconds = parseInt(customMatch[1]) || 10;
@@ -744,13 +702,10 @@ export async function POST(req: Request) {
             const remaining = totalSeconds % maxClipDur;
             clipDur = remaining === 0 ? maxClipDur : remaining;
             if (selectedModel === 'runway') {
-                // Runway chỉ nhận 5 hoặc 10
                 clipDur = clipDur <= 5 ? 5 : 10;
             } else if (selectedModel === 'kling') {
-                // Kling v3 chỉ nhận 5s
                 clipDur = 5;
             } else if (selectedModel === 'veo') {
-                // Veo minimum ~5s — clip quá ngắn sẽ bị reject, round lên 5s
                 if (clipDur < 5) clipDur = 5;
             }
         }
@@ -764,7 +719,6 @@ export async function POST(req: Request) {
     const ratio = config?.aspectRatio === '16:9' ? '1280:720' : '720:1280';
     const audioFileName = `fpt_${finalScriptId}.mp3`;
     const audioFilePath = path.join(audioDir, audioFileName);
-    // --- RESOLVE PRODUCT IMAGE ---
     let finalProductImage = config?.productImage || configData.savedProductImageUrl;
     if (finalProductImage && finalProductImage.startsWith('/')) {
       try {
@@ -781,28 +735,23 @@ export async function POST(req: Request) {
     }
     const productImage = finalProductImage;
 
-    // --- PIPELINE: GENERATE ALL CLIPS ---
     console.log(`[PIPELINE] Multi-clip Generation: ${numClips} clips for ${totalSeconds}s total using ${selectedModel.toUpperCase()}.`);
     
-    // Gen Audio in parallel with video batch
     const audioPromise = config?.voiceOver !== false
         ? generateAudioTask(totalAudioScript, config, finalScriptId, audioDir, audioFilePath, fptApiKey || undefined)
         : Promise.resolve('');
 
     const videoTasks = clipsConfig.map(async (c, i) => {
-        // Phân bổ scenes cho clip này (nguyên tắc chia đều % thời gian)
         const startIdx = Math.floor((i / numClips) * scenes.length);
         const endIdx = Math.floor(((i + 1) / numClips) * scenes.length);
         const clipScenes = scenes.slice(startIdx, Math.max(endIdx, startIdx + 1));
         
         const combinedDesc = clipScenes.map(s => `${s.visualDescription} ${s.technicalKeywords}`).join(' ');
         
-        // Food là HERO, character là PHỤ — nhất quán qua tất cả clip
         const continuityNote = i > 0
             ? `CONTINUITY: Identical food appearance and ${locationContext} setting as previous clip. Same character.`
             : `OPENING: Begin with extreme macro close-up of the food.`;
 
-        // === UNIVERSAL VIDEO NARRATIVE RULES ===
         // Rule 1: Food opens the video and stays as hero throughout.
         // Rule 2: Food must be 100% identical to reference at all times — no distortion, no added props.
         // Rule 3: Camera pulls back to reveal Vietnamese character nearby (not touching food).
@@ -814,20 +763,14 @@ export async function POST(req: Request) {
         const emotionNote = config?.emotion ? emotionToVisual(config.emotion) : '';
         const toneNote = config?.tone ? toneToVisual(config.tone) : '';
 
-        // ai_character dùng 3D animated style — không dùng "realistic skin texture"
         const isAiCharacter = characterId === 'ai_character';
         const depthNote = isAiCharacter
           ? 'Stylized 3D depth, expressive animated character design (Pixar/Disney style).'
           : 'Full 3D depth, realistic skin texture.';
 
-        // FOOD PHASE nói rõ "macro close-up — character just outside frame" để giải thích
-        // tại sao character chưa thấy, tránh mâu thuẫn với "already present" trong REVEAL PHASE.
-        // "pans to reveal open space" → works for both side-view and overhead food shots.
-        // Gender tag placed first so Runway parses it before the appearance description.
         const genderTag = genderInEng ? `[${genderInEng.toUpperCase()} — ${genderInEng === 'Male' ? 'man, NOT a woman' : 'woman, NOT a man'}] ` : '';
         const charReveal = `The camera pans smoothly to reveal open space beside the food — ${genderTag}${englishCharacterDesc} steps into that open space from the side, physically present in the same 3D scene, standing beside the food in ${locationContext}. Same continuous unbroken shot, no cut, no transition. Character faces camera with a genuine warm smile, natural head nods and gentle hand gestures as if speaking about the food. Minimal physical contact with food. ${depthNote} Background shows ${locationContext}. NOT a split screen, NOT a composite, NOT picture-in-picture, NOT a sticker face overlay, NOT a floating head, NOT a banner, NOT a cutout.`;
 
-        // Compact Vietnamese character desc cho gen4_turbo — phải đủ signal chất lượng để Runway render đẹp
         const roleMap: Record<string, string> = {
           'male_chef':       'handsome male chef in his late 20s, wearing a crisp white chef uniform',
           'lady_consultant': 'beautiful female consultant in her mid-20s, wearing elegant professional attire',
@@ -838,7 +781,6 @@ export async function POST(req: Request) {
           'ai_character':    'cute 3D animated character',
         };
         const charRole = roleMap[characterId] || `${genderInEng.toLowerCase()} person`;
-        // Nam → tóc ngắn, nữ → tóc dài; thêm "photogenic" và "flawless skin" để Runway render chất lượng hơn
         const hairDesc = genderInEng === 'Male' ? 'short neat straight jet-black hair' : 'long silky straight jet-black hair';
         const compactVietnameseDesc = isAiCharacter
           ? 'A cute 3D animated character (Pixar/Disney style)'
@@ -846,9 +788,6 @@ export async function POST(req: Request) {
 
         const visualPrompt = isGen4Turbo
             ? [
-                // Gen-4 Turbo I2V: reference image IS the first frame.
-                // ONE unified scene description — no temporal phases (Runway reads them as vertical spatial splits).
-                // "walks into" → entrance motion into the open upper area, not static placement.
                 `Cinematic food marketing video, single continuous shot, no cuts.`,
                 `The food from the reference image fills the foreground — preserve 100%: exact shape, embossed patterns, brand markings, color, pixel-identical throughout. Zero morphing, zero distortion.`,
                 `${compactVietnameseDesc} walks into the open upper portion of the frame from the side, settling behind the food display — waist-up, mid-distance from camera. Food stays closer and larger in frame. Character smiles warmly toward camera, lips moving as if speaking and introducing the food, gentle head nods and light hand gestures.`,
@@ -872,7 +811,6 @@ export async function POST(req: Request) {
                   config?.transitions === false ? `No cuts.` : '',
                 ].filter(Boolean).join(' ');
 
-        // Runway: hard cap 1000 chars. Kling/Veo: up to 1500 chars.
         const promptMaxLen = (selectedModel === 'kling' || selectedModel === 'veo') ? 1500 : 1000;
         const rawPrompt = visualPrompt;
         const finalVisualPrompt = rawPrompt.length <= promptMaxLen
@@ -888,11 +826,8 @@ export async function POST(req: Request) {
         }
     });
 
-    // --- PIPELINE EXECUTION: Audio & Video chạy ĐỘC LẬP ---
-    // Audio luôn được chờ hoàn thành, không bị ảnh hưởng bởi video fail
     const [audioResult, ...videoResults] = await Promise.allSettled([audioPromise, ...videoTasks]);
 
-    // --- Xử lý Audio (luôn lưu dù video fail) ---
     const audioUrl = audioResult.status === 'fulfilled' ? (audioResult.value as string) : '';
     if (audioResult.status === 'rejected') {
         console.error('[PIPELINE-AUDIO-ERROR]', audioResult.reason);
@@ -900,7 +835,6 @@ export async function POST(req: Request) {
         console.log(`[PIPELINE] Audio saved successfully: ${audioUrl}`);
     }
 
-    // --- Xử lý Video ---
     const failedClips = videoResults.filter(r => r.status === 'rejected');
     const succeededClips = videoResults.filter(r => r.status === 'fulfilled') as PromiseFulfilledResult<string>[];
     const rawVideoUrls = succeededClips.map(r => r.value);
@@ -910,12 +844,9 @@ export async function POST(req: Request) {
         console.error(`[PIPELINE-VIDEO-ERROR] ${failedClips.length}/${videoResults.length} clips failed. First error:`, firstError?.message || firstError);
     }
 
-    // Nếu KHÔNG có clip video nào thành công
     if (rawVideoUrls.length === 0) {
         const videoError = (failedClips[0] as PromiseRejectedResult)?.reason;
         await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: 'failed' } });
-        
-        // Vẫn lưu scene với audio nếu có
         if (audioUrl) {
             await prisma.videoScene.create({
               data: {
@@ -928,8 +859,7 @@ export async function POST(req: Request) {
               },
             });
         }
-        
-        // Extract API source from error for frontend toast
+
         const apiSource = (videoError as any)?.apiSource || 'unknown';
         return NextResponse.json({ 
             error: videoError?.message || 'Video generation failed',
@@ -940,7 +870,6 @@ export async function POST(req: Request) {
     }
 
     try {
-        // --- FFmpeg STITCHING ---
         let finalVideoUrl = rawVideoUrls[0];
         const finalVideoName = `final_${finalScriptId}.mp4`;
         const finalVideoPath = path.join(videoDir, finalVideoName);
@@ -949,7 +878,6 @@ export async function POST(req: Request) {
         const { execSync } = require('child_process');
         const ffmpegPath = path.join(process.cwd(), 'bin', 'ffmpeg.exe');
         
-        // Tạo file list.txt cho concat
         const listPath = path.join(videoDir, `list_${finalScriptId}.txt`);
         let listContent = "";
         
@@ -961,19 +889,12 @@ export async function POST(req: Request) {
             listContent += `file 'part_${i}_${finalScriptId}.mp4'\n`;
         }
         fs.writeFileSync(listPath, listContent);
-
-        // Nối video và lồng audio
-        // Nếu chỉ có 1 clip → dùng trực tiếp, bỏ qua bước concat để tránh file corrupt
         let rawVideoOnlyPath: string;
-
         if (rawVideoUrls.length === 1) {
-            // Trường hợp 1 clip: download và dùng trực tiếp
             rawVideoOnlyPath = path.join(videoDir, `part_0_${finalScriptId}.mp4`);
             console.log(`[FFMPEG] Single clip — skipping concat, using downloaded file directly.`);
         } else {
-            // Trường hợp nhiều clip: Bước 1 — Concat video (không có audio)
             rawVideoOnlyPath = `${finalVideoPath}.tmp.mp4`;
-            // Tạo list.txt với absolute path để tránh lỗi path resolution trên Windows
             const listContent2 = rawVideoUrls.map((_, i) =>
                 `file '${path.join(videoDir, `part_${i}_${finalScriptId}.mp4`).replace(/\\/g, '/')}'`
             ).join('\n');
@@ -983,18 +904,13 @@ export async function POST(req: Request) {
             execSync(concatOnlyCmd, { cwd: videoDir, timeout: 600000 });
         }
 
-        // Bước cuối: Merge audio vào video
-        // -movflags +faststart: đảm bảo moov atom ở đầu file → không bị corrupt khi phát
-        // apad=whole_dur: pad silence to at least (video+2)s so -shortest always stops at video end.
-        // Without explicit whole_dur, apad can loop audio when used with -c:v copy -shortest.
         const mergeCmd = fs.existsSync(audioFilePath)
             ? `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -i "${audioFilePath}" -filter_complex "[1:a]apad=whole_dur=${actualTotalSeconds + 2}[aout]" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart "${finalVideoPath}"`
             : `"${ffmpegPath}" -y -i "${rawVideoOnlyPath}" -c:v copy -movflags +faststart "${finalVideoPath}"`;
             
         console.log(`[FFMPEG] Merging audio: ${fs.existsSync(audioFilePath) ? 'YES' : 'NO AUDIO'}`);
         execSync(mergeCmd, { cwd: videoDir, timeout: 600000 });
-        
-        // Dọn dẹp file tmp
+
         const tmpConcatPath = `${finalVideoPath}.tmp.mp4`;
         if (fs.existsSync(tmpConcatPath)) fs.unlinkSync(tmpConcatPath);
         finalVideoUrl = `/api/media/videos/${finalVideoName}`;

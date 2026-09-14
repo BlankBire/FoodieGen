@@ -120,7 +120,6 @@ export async function POST(req: Request) {
     const sceneCountStr = String(numScenes || "2 cảnh");
     let sceneCount = parseInt(sceneCountStr.replace(/[^0-9]/g, "")) || 2;
     
-    // Nếu là chế độ Marketing, ép số cảnh lên 7 để đảm bảo thời lượng 60-90s
     if (isMarketingMode) {
       sceneCount = 7;
     }
@@ -137,14 +136,11 @@ export async function POST(req: Request) {
       durationNum = parseInt(durationStr.replace(/[^0-9]/g, "")) || 10;
     }
     
-    // Nếu là chế độ Marketing, thời lượng mục tiêu là 60-90s
     if (isMarketingMode) {
-      durationNum = 75; // Trung bình 75s
+      durationNum = 75;
     }
 
-    // Buffer 2s cuối video để speech kết thúc tự nhiên ở giây 8-9 (không bị cắt giữa chừng)
     const voiceDuration = durationNum - 2;
-    // FPT.AI đọc tiếng Việt ~3 từ/giây
     const maxWords = Math.floor(voiceDuration * 3);
     const minWords = Math.floor(voiceDuration * 2.5);
 
@@ -152,7 +148,6 @@ export async function POST(req: Request) {
       `[V8-DEBUG] Mode: ${isMarketingMode ? 'MARKETING' : 'CREATIVE'} | Target Video: ${durationNum}s | Voice: ${voiceDuration}s | Words: ${minWords}–${maxWords}`,
     );
 
-    // --- SAVE PRODUCT IMAGE IF EXISTS ---
     let savedProductImageUrl = "";
     if (productImage && productImage.includes("base64,")) {
       try {
@@ -283,7 +278,6 @@ QUY TẮC VỀ ĐỘ DÀI:
 `;
     }
 
-    // === GENRE-SPECIFIC DIALOGUE GUIDE ===
     function buildGenrePrompt(genre: string): string {
       if (!genre) return '';
       const g = genre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
@@ -331,7 +325,6 @@ QUY TẮC LỜI THOẠI THEO THỂ LOẠI — STORYTELLING (KỂ CHUYỆN):
 - Giọng điệu: Chậm rãi, thơ mộng, giàu hình ảnh. Tránh ngôn ngữ thương mại trực tiếp.`,
       };
 
-      // Normalize và tìm match
       const normalizedG = g.replace(/[^a-z0-9 ]/g, '').trim();
       for (const [key, guide] of Object.entries(knownGenres)) {
         if (normalizedG.includes(key) || key.includes(normalizedG)) {
@@ -339,7 +332,6 @@ QUY TẮC LỜI THOẠI THEO THỂ LOẠI — STORYTELLING (KỂ CHUYỆN):
         }
       }
 
-      // Fallback cho thể loại tùy chỉnh
       return `
 THỂ LOẠI VIDEO TÙY CHỈNH: "${genre}".
 QUY TẮC LỜI THOẠI THEO THỂ LOẠI:
@@ -416,7 +408,6 @@ The invitation must reference the brand when available and be polite, complete, 
         break; // Success!
       } catch (aiErr: any) {
         attempts++;
-        // Nhận diện lỗi 503 hoặc quá tải
         const errString = JSON.stringify(aiErr);
         const isRetryable =
           errString.includes("503") ||
@@ -429,13 +420,12 @@ The invitation must reference the brand when available and be polite, complete, 
           console.warn(
             `[GEMINI-RETRY] Transient error. Attempt ${attempts}/${maxAttempts}...`,
           );
-          await new Promise((r) => setTimeout(r, 4000)); // Đợi 4s
+          await new Promise((r) => setTimeout(r, 4000)); 
           continue;
         }
 
         console.error("[V8-DEBUG] AI GENERATION FAILED:", aiErr);
 
-        // --- GRACEFUL FALLBACK ---
         if (
           aiErr.message?.includes("Unable to process input image") ||
           aiErr.message?.includes("400")
@@ -587,7 +577,7 @@ The invitation must reference the brand when available and be polite, complete, 
         .map((s: any) => s.technicalKeywords || '')
         .filter(Boolean)
         .join(', ')
-        // Remove non-ASCII segments (e.g. "character: Bếp trưởng Hoàng") that Gemini injects
+        // Remove non-ASCII segments that Gemini injects
         .replace(/[^\x00-\x7F]+[^,]*/g, '')
         .replace(/,\s*,/g, ',')
         .replace(/^,\s*|,\s*$/g, '')

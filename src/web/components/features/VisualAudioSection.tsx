@@ -73,7 +73,6 @@ export const VisualAudioSection = ({
     if (val !== 'custom') {
       setEmotion(val);
     }
-    // Don't set emotion when switching to custom — wait for user input
   };
 
   const handleCustomEmotionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +87,6 @@ export const VisualAudioSection = ({
     if (val !== 'custom') {
       setActiveStyle(val);
     }
-    // Don't set activeStyle when switching to custom — wait for user input
   };
 
   const handleCustomStyleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,7 +97,7 @@ export const VisualAudioSection = ({
 
   return (
     <div className="config-grid" style={{ marginTop: 'var(--space-2)' }}>
-      {/* COL 1: VISUALS */}
+      {}
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
         <div className="section-title">
           <span className="section-title-dot" />
@@ -182,7 +180,7 @@ export const VisualAudioSection = ({
         </div>
       </div>
 
-      {/* COL 2: AUDIO */}
+      {}
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-4)' }}>
         <div className="section-title">
           <span className="section-title-dot" />

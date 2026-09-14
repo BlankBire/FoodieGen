@@ -1,5 +1,3 @@
-/* ─── API CONSTANTS ─── */
-
 export const VISUAL_STYLES = [
   { id: 'cinematic', label: 'Cinematic'  },
   { id: 'golden',    label: 'Golden Hour' },

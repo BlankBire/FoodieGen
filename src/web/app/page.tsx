@@ -98,7 +98,6 @@ export default function Home() {
   }, [isReadingMode])
 
   useEffect(() => {
-    // Nếu thiết bị chưa unlock token, xóa mọi API key để không thể bypass token gate
     if (localStorage.getItem('foodiegen_settings_unlocked') !== 'true') {
       localStorage.removeItem('foodiegen_google_api_key')
       localStorage.removeItem('foodiegen_runway_api_key')
@@ -182,7 +181,7 @@ export default function Home() {
     setCharacterId(defaultChar.id)
     setMainCharacter(defaultChar.defaultDescription)
     setCharacterType(defaultChar.gender)
-    // Default to Le Minh for Male chef
+
     setVoiceGender('leminh')
     
     setFoodTopic('')
@@ -233,7 +232,6 @@ export default function Home() {
     const fullUrl = videoUrl.startsWith('http') ? videoUrl : `${API_BASE}${videoUrl}`
     const fileName = `foodiegen_video_${Date.now()}.mp4`
 
-    // Electron: dùng native Save As dialog
     if ((window as any).electronAPI?.downloadFile) {
       try {
         showToast('Đang mở cửa sổ lưu file...')
@@ -252,7 +250,6 @@ export default function Home() {
       return
     }
 
-    // Fallback cho trình duyệt (dev mode)
     try {
       showToast('Đang chuẩn bị tải xuống...')
       const res = await fetch(fullUrl)
@@ -360,7 +357,6 @@ export default function Home() {
       if (data.error) throw new Error(data.error)
       
       if (data.fullAudioScript || data.scenes) {
-        // Compose format hiển thị từ dữ liệu có sẵn
         let displayParts: string[] = []
 
         if (data.scenes && data.scenes.length > 0) {
@@ -402,7 +398,7 @@ export default function Home() {
       } else if (cleanError.includes('API key not valid') || cleanError.includes('API_KEY_INVALID')) {
          msg = `API Key ${apiName} không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại.`
       } else if (cleanError.includes('API Key') || cleanError.includes('api-key') || cleanError.includes('Vui lòng')) {
-         msg = cleanError // Already a user-friendly message
+         msg = cleanError
       } else if (cleanError.includes('RESOURCE_EXHAUSTED') || cleanError.includes('quota') || cleanError.includes('429')) {
          msg = `Tài khoản ${apiName} đã hết Quota/Credit. Vui lòng nạp thêm hoặc đổi API Key.`
       } else if (cleanError.includes('timeout') || cleanError.toLowerCase().includes('time out')) {
@@ -433,7 +429,6 @@ export default function Home() {
       // Map workflow model → backend engine
       const backendModel = (model === 'runway_manual' || model === 'runway_ai') ? 'runway' : (model === 'veo3' ? 'veo' : 'kling');
 
-      // 1. Gửi request generate video
       const resVideo = await fetch(`${API_BASE}/api/generate/video`, {
         method: 'POST',
         headers: { 
@@ -446,8 +441,8 @@ export default function Home() {
         },
         body: JSON.stringify({ 
           scriptId: scriptId,
-          manualScript: script, // Nội dung kịch bản ngôn ngữ tự nhiên
-          scenes: rawScenes,   // DỮ LIỆU PHÂN CẢNH NHÁP (ẨN DƯỚI GIAO DIỆN)
+          manualScript: script, 
+          scenes: rawScenes,   
           config: {
             resolution,
             aspectRatio,
@@ -483,7 +478,6 @@ export default function Home() {
         setVideoUrl(finalVideoUrl)
         if (finalScene.audioUrl) setAudioUrl(toAssetUrl(finalScene.audioUrl))
         
-        // Hiển thị video đã ghép hoàn chỉnh lên Preview
         setVideoScenes([{
           videoClipUrl: finalVideoUrl,
           audioUrl: finalScene.audioUrl ? toAssetUrl(finalScene.audioUrl) : '',
@@ -520,7 +514,7 @@ export default function Home() {
       if (errorStr.includes('Failed to fetch')) {
         msg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
       } else if (cleanError.includes('API Key') || cleanError.includes('api-key') || cleanError.includes('Vui lòng cấu hình')) {
-        msg = cleanError; // Already user-friendly with API name
+        msg = cleanError; 
       } else if (cleanError.includes('API key not valid') || cleanError.includes('API_KEY_INVALID') || cleanError.includes('PERMISSION_DENIED')) {
         msg = `API Key ${apiName} không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại trong phần Cài đặt.`;
       } else if (cleanError.includes('timeout') || cleanError.toLowerCase().includes('time out') || cleanError.includes('timed out')) {
@@ -682,11 +676,11 @@ export default function Home() {
         />
       </main>
 
-      {/* Toast Notification - Right Side Slide-in (Orange Theme) */}
+      {/* Toast Notification - Right Side Slide-in */}
       {toast && (
         <div style={{
           position: 'fixed',
-          top: '80px', // Near navbar
+          top: '80px', 
           right: '24px',
           zIndex: 9999,
           pointerEvents: 'none',
@@ -699,7 +693,7 @@ export default function Home() {
           transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
           <div style={{
-            background: '#ea580c', // Dark orange accent
+            background: '#ea580c', 
             color: 'white',
             borderRadius: '12px',
             padding: '16px 20px',

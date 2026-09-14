@@ -36,10 +36,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   };
 
-  // Determine which API keys are needed based on model
   const needsRunway = model === 'runway_manual' || model === 'runway_ai';
   const needsKling = model === 'kling_ai';
-  // Google & FPT are always needed
 
   // Load keys from localStorage on mount
   useEffect(() => {
@@ -142,8 +140,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
       setTestingStatus(prev => ({ ...prev, [provider]: 'error' }));
       setTestMessage({ type: 'error', text: err.message || 'Lỗi kết nối' });
     }
-    
-    // Auto clear message after 5s
+  
     setTimeout(() => {
       setTestMessage(null);
     }, 5000);
@@ -523,7 +520,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập Access Key từ Kling AI...',
             needsKling,
             'Chỉ cần khi chọn quy trình Kling AI',
-            'kling' // Provider 'kling' added to the first one, which will test both
+            'kling' 
           )}
 
           {renderApiInput(
@@ -533,7 +530,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
             'Nhập Secret Key từ Kling AI...',
             needsKling,
             'Chỉ cần khi chọn quy trình Kling AI',
-            // No provider here so we don't duplicate the test button
           )}
         </div>
 

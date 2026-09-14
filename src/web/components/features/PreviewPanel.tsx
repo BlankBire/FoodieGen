@@ -66,7 +66,6 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
       setProductImage(dataUrl);
-      // Kiểm tra tỉ lệ ảnh so với video
       const img = new window.Image();
       img.onload = () => {
         const isPortraitVideo = config.aspectRatio === '9:16';
@@ -96,7 +95,7 @@ export const PreviewPanel = ({ scenes, productImage, setProductImage, config, on
     if (scenes && currentIdx < scenes.length - 1) {
       setCurrentIdx(currentIdx + 1);
     } else {
-      setCurrentIdx(0); // Loop back to start
+      setCurrentIdx(0); 
     }
   };
 

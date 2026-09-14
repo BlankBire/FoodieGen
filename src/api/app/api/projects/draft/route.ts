@@ -6,11 +6,8 @@ console.log("[TRACE] Loaded route: /api/projects/draft");
 export async function POST(req: Request) {
   try {
     const { projectId, scriptId, topic, config, scenes } = await req.json();
-
-    // Dùng userId mặc định cho hệ thống chưa có Auth
     const defaultUserId = "123e4567-e89b-12d3-a456-426614174000";
 
-    // Đảm bảo user mặc định luôn tồn tại (xử lý fresh DB sau lần cài đặt mới)
     await prisma.user.upsert({
       where: { id: defaultUserId },
       update: {},
@@ -22,7 +19,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // 1. Tìm hoặc Tạo Project — dùng upsert để xử lý projectId lỗi thời (đã bị xóa)
     let project;
     if (projectId) {
       project = await prisma.videoProject.upsert({
@@ -49,7 +45,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Lưu nội dung vào VideoScript — dùng upsert để xử lý scriptId lỗi thời
     const contentPayload = {
       scenes: scenes || [],
       config: config || {},

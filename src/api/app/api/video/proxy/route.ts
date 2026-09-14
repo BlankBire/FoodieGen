@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * Proxy for Google Generative AI file download URLs.
- * Those URLs require x-goog-api-key header - browser <video src=""> cannot send it.
- * This route fetches the file server-side with the API key and streams it to the client.
- */
 export async function GET(req: NextRequest) {
   try {
     const u = req.nextUrl.searchParams.get('u');

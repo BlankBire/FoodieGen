@@ -31,7 +31,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, message: 'Google Gemini API Key hợp lệ!' });
       } catch (err: any) {
         const msg = err.message || '';
-        // Bắt lỗi quota để vẫn báo là key hợp lệ (vì auth thành công, chỉ là hết quota)
         if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
             return NextResponse.json({ success: true, message: 'Google Gemini API Key hợp lệ!' });
         }
@@ -72,7 +71,6 @@ export async function POST(req: Request) {
         if (data.error === 0 || data.async) {
             return NextResponse.json({ success: true, message: 'FPT AI API Key hợp lệ!' });
         } else {
-            // Nếu lỗi báo quota thì auth vẫn thành công
             if (data.message && data.message.toLowerCase().includes('quota')) {
                 return NextResponse.json({ success: true, message: 'FPT AI API Key hợp lệ!' });
             }
@@ -93,19 +91,14 @@ export async function POST(req: Request) {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          // Cố tình truyền model sai để Kling báo lỗi "Invalid model" thay vì tạo video thật (tránh trừ tiền oan của user)
-          // Nếu Auth sai, Kling sẽ báo lỗi 1002 hoặc 1200 trước khi check model.
           body: JSON.stringify({ model: 'kling-test-dummy-model', prompt: 'test' })
         });
         const data = await resp.json();
-        
         // 1002: Access Key not found
         // 1200: Token invalid (sai Secret Key hoặc sai format)
         if (data.code === 1002 || data.code === 1200 || data.code === 401) {
             throw new Error('Access Key/Secret Key Kling AI không hợp lệ hoặc đã hết hạn.');
         } else {
-            // Nếu qua được ải Auth, Kling sẽ báo lỗi 1000 (Invalid param) hoặc 1004 (Model not found)
-            // Điều này chứng tỏ cặp Key đã hợp lệ 100%
             return NextResponse.json({ success: true, message: `Kling AI Keys hợp lệ!` });
         }
       } catch (err: any) {

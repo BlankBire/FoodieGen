@@ -32,7 +32,6 @@ const templateDbPath = path.join(binDir, 'template.db');
 const schemaPath = path.join(root, 'src', 'api', 'prisma', 'schema.prisma');
 
 try {
-  // Point DATABASE_URL to our template file and push schema
   const env = { ...process.env, DATABASE_URL: `file:${templateDbPath}` };
   execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss --skip-generate`, { 
     env,

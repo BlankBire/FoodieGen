@@ -1,11 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap');
 
-/* ─────────────────────────────────────────────
-   DESIGN TOKENS — VeoFood Studio
-   Warm culinary dark theme
-───────────────────────────────────────────── */
 :root {
-  /* Background layers */
   --bg-base:        #faf7f4;
   --bg-surface:     #ffffff;
   --bg-card:        #ffffff;
@@ -13,7 +8,6 @@
   --bg-input:       #f7f3ef;
   --bg-glass:       rgba(255, 255, 255, 0.85);
 
-  /* Accent palette — amber / orange (unchanged) */
   --amber-50:       #fffbeb;
   --amber-100:      #fef3c7;
   --amber-300:      #fcd34d;
@@ -25,42 +19,35 @@
   --orange-600:     #ea580c;
   --red-400:        #f87171;
 
-  /* Gradient presets */
   --gradient-primary:  linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
   --gradient-subtle:   linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(234,88,12,0.04) 100%);
   --gradient-card:     linear-gradient(160deg, #ffffff 0%, #fdf9f4 100%);
   --gradient-glow:     radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 60%);
 
-  /* Text */
   --text-primary:   #1c1309;
   --text-secondary: #4a3728;
   --text-muted:     #9c7f6a;
   --text-accent:    #d97706;
 
-  /* Border */
   --border-default: rgba(180, 130, 80, 0.15);
   --border-accent:  rgba(245, 158, 11, 0.4);
   --border-focus:   rgba(245, 158, 11, 0.7);
 
-  /* Shadows */
   --shadow-card:    0 2px 16px rgba(120, 80, 40, 0.08);
   --shadow-glow:    0 0 30px rgba(245, 158, 11, 0.1);
   --shadow-button:  0 4px 20px rgba(234, 88, 12, 0.3);
 
-  /* Radii */
   --radius-sm:  6px;
   --radius-md:  12px;
   --radius-lg:  18px;
   --radius-xl:  24px;
   --radius-full: 9999px;
 
-  /* Transitions */
   --ease-default:  cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-base: 250ms;
   --duration-slow: 400ms;
 
-  /* Spacing scale */
   --space-1:  4px;
   --space-2:  8px;
   --space-3:  12px;
@@ -71,13 +58,11 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Sidebar */
   --sidebar-width: 240px;
   --sidebar-collapsed: 72px;
 }
 
 [data-theme='dark'] {
-    /* Background layers */
     --bg-base:        #121212;
     --bg-surface:     #1e1e1e;
     --bg-card:        #1e1e1e;
@@ -85,21 +70,17 @@
     --bg-input:       #2a2a2a;
     --bg-glass:       rgba(30, 30, 30, 0.85);
 
-    /* Gradients */
     --gradient-card:  linear-gradient(160deg, #1e1e1e 0%, #121212 100%);
     
-    /* Text */
     --text-primary:   #f5f5f5;
     --text-secondary: #d4d4d4;
     --text-muted:     #8a8a8a;
     --text-accent:    #fbbf24;
 
-    /* Border */
     --border-default: rgba(255, 255, 255, 0.1);
     --border-accent:  rgba(245, 158, 11, 0.5);
     --border-focus:   rgba(245, 158, 11, 0.8);
 
-    /* Shadows */
     --shadow-card:    0 4px 24px rgba(0, 0, 0, 0.4);
     --shadow-glow:    0 0 30px rgba(245, 158, 11, 0.15);
   }
@@ -111,9 +92,7 @@
     radial-gradient(ellipse at 20% 100%, rgba(234,88,12,0.015) 0%, transparent 50%);
 }
 
-/* ─────────────────────────────────────────────
-   RESET & BASE
-───────────────────────────────────────────── */
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -135,7 +114,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Subtle warm tint overlay */
 body::before {
   content: '';
   position: fixed;
@@ -184,11 +162,7 @@ input, textarea, select {
   background: rgba(245, 158, 11, 0.35);
 }
 
-/* ─────────────────────────────────────────────
-   LAYOUT UTILITIES
-───────────────────────────────────────────── */
 
-/* (sidebar removed) */
 .sidebar-UNUSED {
   position: fixed;
   left: 0; top: 0; bottom: 0;
@@ -357,9 +331,7 @@ input, textarea, select {
   white-space: nowrap;
 }
 
-/* ─────────────────────────────────────────────
-   GLASS CARD
-───────────────────────────────────────────── */
+
 .glass-card {
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
@@ -375,9 +347,7 @@ input, textarea, select {
   box-shadow: var(--shadow-card), var(--shadow-glow);
 }
 
-/* ─────────────────────────────────────────────
-   BUTTONS
-───────────────────────────────────────────── */
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -415,10 +385,7 @@ input, textarea, select {
   transform: scale(0.98);
 }
 
-/* ─────────────────────────────────────────────
-   NOTIFICATIONS (TOAST)
-   Premium animated floating alerts
-───────────────────────────────────────────── */
+
 .toast-container {
   position: fixed;
   top: 24px;
@@ -595,9 +562,7 @@ input, textarea, select {
   box-shadow: 0 8px 30px rgba(234, 88, 12, 0.5);
 }
 
-/* ─────────────────────────────────────────────
-   FORM ELEMENTS
-───────────────────────────────────────────── */
+
 .form-label {
   display: block;
   font-size: 12px;
@@ -676,10 +641,7 @@ input, textarea, select {
   background: var(--bg-card);
 }
 
-/* ─────────────────────────────────────────────
-   COMBOBOX (SEARCHABLE SELECT)
-   Premium adaptive input field
-───────────────────────────────────────────── */
+
 .combobox-container {
   position: relative;
   width: 100%;
@@ -739,7 +701,7 @@ input, textarea, select {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Custom indicator for input mimicking a select */
+
 .combobox-chevron {
   position: absolute;
   right: 14px;
@@ -754,9 +716,7 @@ input, textarea, select {
   transform: translateY(-50%) rotate(180deg);
 }
 
-/* ─────────────────────────────────────────────
-   RANGE SLIDER
-───────────────────────────────────────────── */
+
 .range-track {
   position: relative;
   height: 4px;
@@ -817,9 +777,7 @@ input, textarea, select {
   background: var(--amber-50);
 }
 
-/* ─────────────────────────────────────────────
-   TOGGLE SWITCH
-───────────────────────────────────────────── */
+
 .toggle-wrap {
   display: flex;
   align-items: center;
@@ -871,9 +829,7 @@ input, textarea, select {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
 }
 
-/* ─────────────────────────────────────────────
-   RESOLUTION SELECTOR
-───────────────────────────────────────────── */
+
 .resolution-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -934,9 +890,7 @@ input, textarea, select {
   letter-spacing: 0.05em;
 }
 
-/* ─────────────────────────────────────────────
-   STYLE CARDS (Visual Effects)
-───────────────────────────────────────────── */
+
 .style-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -1006,9 +960,7 @@ input, textarea, select {
   color: var(--amber-400);
 }
 
-/* ─────────────────────────────────────────────
-   SEGMENT / PILL BUTTON GROUP
-───────────────────────────────────────────── */
+
 .segment-group {
   display: flex;
   gap: var(--space-2);
@@ -1038,7 +990,7 @@ input, textarea, select {
   color: var(--amber-400);
 }
 
-/* Tone Button - Unified Style */
+
 .tones-container-responsive {
   display: flex;
   gap: 6px;
@@ -1073,9 +1025,7 @@ input, textarea, select {
   font-weight: 600;
 }
 
-/* ─────────────────────────────────────────────
-   SECTION CARD (form groups)
-───────────────────────────────────────────── */
+
 .section-card {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
@@ -1150,9 +1100,7 @@ input, textarea, select {
   gap: var(--space-4);
 }
 
-/* ─────────────────────────────────────────────
-   AI MODEL BADGE
-───────────────────────────────────────────── */
+
 .ai-model-badge {
   display: flex;
   align-items: center;
@@ -1202,9 +1150,7 @@ input, textarea, select {
   margin-top: 1px;
 }
 
-/* ─────────────────────────────────────────────
-   PREVIEW PANEL
-───────────────────────────────────────────── */
+
 .preview-panel {
   display: flex;
   flex-direction: column;
@@ -1345,9 +1291,7 @@ input, textarea, select {
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
 }
 
-/* ─────────────────────────────────────────────
-   STEP INDICATOR
-───────────────────────────────────────────── */
+
 .steps-nav {
   display: flex;
   flex-direction: column;
@@ -1422,9 +1366,7 @@ input, textarea, select {
   color: var(--text-secondary);
 }
 
-/* ─────────────────────────────────────────────
-   STATS CARD (Dashboard)
-───────────────────────────────────────────── */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1483,9 +1425,7 @@ input, textarea, select {
   gap: 4px;
 }
 
-/* ─────────────────────────────────────────────
-   VIDEO CARD (History / Dashboard)
-───────────────────────────────────────────── */
+
 .videos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1556,9 +1496,7 @@ input, textarea, select {
   font-weight: 600;
 }
 
-/* ─────────────────────────────────────────────
-   PAGE HEADER
-───────────────────────────────────────────── */
+
 .page-header {
   display: flex;
   align-items: center;
@@ -1582,9 +1520,7 @@ input, textarea, select {
   margin-top: var(--space-1);
 }
 
-/* ─────────────────────────────────────────────
-   CREATE PAGE LAYOUT
-───────────────────────────────────────────── */
+
 .create-layout {
   display: grid;
   grid-template-columns: 200px 1fr 300px;
@@ -1618,9 +1554,7 @@ input, textarea, select {
   max-height: 100vh;
 }
 
-/* ─────────────────────────────────────────────
-   TAG / CHIP
-───────────────────────────────────────────── */
+
 .chip-group {
   display: flex;
   flex-wrap: wrap;
@@ -1650,9 +1584,7 @@ input, textarea, select {
   color: var(--amber-400);
 }
 
-/* ─────────────────────────────────────────────
-   LOADING / SHIMMER
-───────────────────────────────────────────── */
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -1669,9 +1601,7 @@ input, textarea, select {
   border-radius: var(--radius-md);
 }
 
-/* ─────────────────────────────────────────────
-   HERO BANNER (Dashboard)
-───────────────────────────────────────────── */
+
 .hero-banner {
   background: var(--gradient-card);
   border: 1px solid var(--border-accent);
@@ -1744,28 +1674,25 @@ input, textarea, select {
   gap: var(--space-3);
 }
 
-/* Page padding wrapper */
+
 .page-content {
   padding: var(--space-8);
   max-width: 1600px;
   margin: 0 auto;
 }
 
-/* Divider */
 .divider {
   height: 1px;
   background: var(--border-default);
   margin: var(--space-5) 0;
 }
 
-/* Helper text */
 .helper-text {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: var(--space-2);
 }
 
-/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1787,7 +1714,6 @@ input, textarea, select {
   border: 1px solid rgba(74, 222, 128, 0.2);
 }
 
-/* Scrollbar cleanup for create editor */
 .create-editor::-webkit-scrollbar {
   width: 3px;
 }
@@ -1795,7 +1721,6 @@ input, textarea, select {
   width: 3px;
 }
 
-/* Fade-in animation */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1805,21 +1730,13 @@ input, textarea, select {
   animation: fadeInUp 0.4s var(--ease-default) both;
 }
 
-/* Section card stagger */
 .section-card:nth-child(1) { animation: fadeInUp 0.4s 0.05s var(--ease-default) both; }
 .section-card:nth-child(2) { animation: fadeInUp 0.4s 0.10s var(--ease-default) both; }
 .section-card:nth-child(3) { animation: fadeInUp 0.4s 0.15s var(--ease-default) both; }
 .section-card:nth-child(4) { animation: fadeInUp 0.4s 0.20s var(--ease-default) both; }
 .section-card:nth-child(5) { animation: fadeInUp 0.4s 0.25s var(--ease-default) both; }
 
-/* ─────────────────────────────────────────────
-   RESPONSIVE DESIGN (Media Queries)
-   VeoFood Studio Standard
-   - Tablet: < 1024px
-   - Mobile: < 768px
-───────────────────────────────────────────── */
 
-/* Main Responsive Classes */
 .main-grid-responsive {
   display: grid;
   grid-template-columns: 1fr 320px;
@@ -1882,7 +1799,6 @@ input, textarea, select {
     padding: var(--space-4) !important;
   }
 
-  /* Tones grid responsive */
   .tones-container-responsive {
     flex-wrap: wrap;
     gap: 8px;
@@ -1895,7 +1811,6 @@ input, textarea, select {
     padding: 10px 0;
   }
 
-  /* Style grid responsive */
   .style-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 8px;
@@ -1931,7 +1846,6 @@ input, textarea, select {
   }
 }
 
-/* --- READING MODE OVERLAY --- */
 .reading-mode-overlay {
   position: fixed;
   top: 0;
@@ -2014,7 +1928,6 @@ input, textarea, select {
   transform: translateY(-1px);
 }
 
-/* Slide-down for custom input reveal */
 @keyframes slideDown {
   from { opacity: 0; max-height: 0; transform: translateY(-8px); }
   to { opacity: 1; max-height: 120px; transform: translateY(0); }

@@ -119,7 +119,7 @@ export const ContentSection = ({
     });
   };
 
-  // Whether this workflow uses manual script pasting (no AI generation)
+  // Whether this workflow uses manual script pasting 
   const isManualMode = model === 'runway_manual';
 
   useEffect(() => {
@@ -216,7 +216,7 @@ export const ContentSection = ({
       </div>
       
       <div className="section-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-        {/* 1. Chủ đề */}
+        {}
         <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
           <label className="form-label">Chủ đề món ăn</label>
           <input 
@@ -227,7 +227,7 @@ export const ContentSection = ({
           />
         </div>
 
-        {/* 2. Cấu hình Nhân vật & Bối cảnh */}
+        {}
         <div className="form-row">
           <div className="form-group" style={{ marginBottom:0 }}>
             <label className="form-label">Chọn nhân vật</label>
@@ -272,7 +272,7 @@ export const ContentSection = ({
           </div>
         )}
 
-        {/* 2.1 Lựa chọn giới tính cho nhân vật tùy chỉnh */}
+        {}
         {characterId === 'custom_character' && (
           <div className="form-group animate-slide-down" style={{ marginBottom: 0 }}>
             <label className="form-label">Giới tính nhân vật</label>
@@ -315,7 +315,7 @@ export const ContentSection = ({
           />
         </div>
 
-        {/* 3.Metadata (Thể loại & Số cảnh) */}
+        {}
         <div className="form-row">
           <div className="form-group" style={{ marginBottom:0 }}>
             <label className="form-label">Thể loại</label>
@@ -396,7 +396,7 @@ export const ContentSection = ({
           </div>
         )}
 
-        {/* 4. Tone nội dung */}
+        {}
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label className="form-label" style={{ marginBottom:10 }}>Tone nội dung</label>
           <div className="tones-container-responsive">
@@ -406,7 +406,7 @@ export const ContentSection = ({
           </div>
         </div>
 
-        {/* 5. Kịch bản chi tiết */}
+        {}
         <div style={{ background: 'rgba(245, 158, 11, 0.04)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--amber-200)' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 'var(--space-3)' }}>
@@ -468,7 +468,7 @@ export const ContentSection = ({
             />
           </div>
 
-          {/* Prompt gợi ý — chỉ hiện sau khi AI tạo kịch bản thành công */}
+          {}
           {!isManualMode && suggestedPrompt && (
             <div style={{ marginTop: 'var(--space-4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -519,7 +519,7 @@ export const ContentSection = ({
             </div>
           )}
 
-          {/* Lời thoại — copy dán vào FPT.AI để đọc giọng */}
+          {}
           {!isManualMode && fullAudioScript && (
             <div style={{ marginTop: 'var(--space-4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>

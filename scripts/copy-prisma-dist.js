@@ -41,14 +41,12 @@ const unpackedDir = path.join(distResources, "app.asar.unpacked");
 
 console.log("[COPY-PRISMA] Starting copy processes...");
 
-// Nguồn có thể chứa engine
 const sources = [
   path.join(root, "node_modules", ".prisma"),
   path.join(root, "node_modules", "@prisma", "engines"),
   path.join(root, "node_modules", "@prisma", "client", ".prisma"),
 ];
 
-// Đích cần có engine
 const targets = [
   path.join(unpackedDir, "node_modules", ".prisma"),
   path.join(unpackedDir, "node_modules", "@prisma", "client", ".prisma"),
@@ -66,7 +64,6 @@ sources.forEach(src => {
   }
 });
 
-// Explicitly copy for flat structure (Engine & MSVC DLLs)
 const prismaDir = path.join(distResources, "prisma");
 if (!fs.existsSync(prismaDir)) fs.mkdirSync(prismaDir, { recursive: true });
 
@@ -78,7 +75,6 @@ if (fs.existsSync(flatBinSrc)) {
   copyFileWithRetries(flatBinSrc, flatBinDest);
 }
 
-// Bundle MSVC DLLs for portability
 const msvcDlls = ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"];
 const sys32 = "C:\\Windows\\System32";
 

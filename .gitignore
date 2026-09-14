@@ -75,3 +75,6 @@ tmp/
 .claude/
 .claudeignore
 CLAUDE.md
+
+# Resources
+src/api/public/

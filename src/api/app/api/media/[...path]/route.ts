@@ -2,28 +2,11 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-/**
- * API Route để phục vụ file media (video, audio) từ thư mục public/
- *
- * Lý do: Next.js Standalone mode KHÔNG tự động serve thư mục public/.
- * Trong dev mode, Next.js dev server serve public/ tự động → video/audio luôn accessible.
- * Trong production (electron build), cần API route này để client truy cập được files.
- *
- * URL mapping:
- *   /api/media/videos/final_xxx.mp4  →  public/videos/final_xxx.mp4
- *   /api/media/audio/fpt_xxx.mp3     →  public/audio/fpt_xxx.mp3
- *
- * QUAN TRỌNG: Phải xử lý HTTP Range Requests đúng cách (trả về 206 Partial Content).
- * Browser dùng range requests để load audio track riêng lẻ trong file MP4/video.
- * Nếu server trả về 200 thay vì 206, Chromium sẽ bỏ qua audio track → không có tiếng.
- */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path: segments } = await params;
-
-  // Chống path traversal attack (../)
   const safePath = segments.join('/').replace(/\.\./g, '');
   const filePath = path.join(process.cwd(), 'public', safePath);
 
@@ -35,7 +18,6 @@ export async function GET(
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
 
-    // Xác định Content-Type dựa trên extension
     const ext = path.extname(filePath).toLowerCase();
     const contentTypeMap: Record<string, string> = {
       '.mp4': 'video/mp4',
@@ -51,7 +33,6 @@ export async function GET(
     const rangeHeader = req.headers.get('range');
 
     if (rangeHeader) {
-      // Xử lý Range Request → trả về 206 Partial Content
       const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
       if (!match) {
         return new NextResponse('Invalid Range', { status: 416 });
@@ -85,7 +66,6 @@ export async function GET(
       });
     }
 
-    // Không có Range header → trả toàn bộ file
     const fileBuffer = fs.readFileSync(filePath);
 
     return new NextResponse(fileBuffer, {
